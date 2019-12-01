@@ -1,0 +1,56 @@
+name:                aoc
+version:             0.0.1.0
+git:                 https://gitlab.com/JoJoZ/aoc-2019
+license:             AGPL-3
+author:              "Johan Johansson"
+maintainer:          "jo@jo.zone"
+copyright:           "2019 Johan Johansson"
+
+extra-source-files:
+- README.org
+
+dependencies:
+- base
+
+library:
+  source-dirs: src
+  ghc-options:
+  - -Weverything
+  - -Werror
+  - -Wno-safe
+  - -Wno-unsafe
+  - -Wno-missing-import-lists
+  - -Wno-missing-exported-signatures
+  - -Wno-missing-local-signatures
+  - -Wno-monomorphism-restriction
+  - -Wno-implicit-prelude
+  - -Wno-name-shadowing
+  - -Wno-orphans
+  - -Wno-missed-specialisations
+  - -Wno-all-missed-specialisations
+  - -Wno-unticked-promoted-constructors
+
+executables:
+  aoc:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    - -Weverything
+    - -Werror
+    - -Wno-safe
+    - -Wno-unsafe
+    - -Wno-missing-import-lists
+    - -Wno-missing-exported-signatures
+    - -Wno-missing-local-signatures
+    - -Wno-monomorphism-restriction
+    - -Wno-implicit-prelude
+    - -Wno-name-shadowing
+    - -Wno-orphans
+    - -Wno-missed-specialisations
+    - -Wno-all-missed-specialisations
+    - -Wno-unticked-promoted-constructors
+    dependencies:
+    - aoc
