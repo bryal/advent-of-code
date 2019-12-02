@@ -7,21 +7,20 @@ import Control.Applicative
 import Data.Functor
 import Data.List.Split
 import Lens.Micro.Platform (makeLenses, use, to, modifying)
-import Data.Map.Strict (Map)
-import qualified Data.Map.Strict as Map
+import Data.Sequence (Seq)
+import qualified Data.Sequence as Seq
 
-newtype Pos = Pos { _unPos :: Word } deriving (Ord, Eq)
-makeLenses ''Pos
+newtype Pos = Pos Word deriving (Ord, Eq)
 
 data Instr
     = Add Pos Pos Pos
     | Mul Pos Pos Pos
     | Halt
 
-newtype Pc = Pc { _unPc :: Pos }
+newtype Pc = Pc { _unPc :: Word }
 makeLenses ''Pc
 
-newtype Mem = Mem { _unMem :: Map Pos Word }
+newtype Mem = Mem { _unMem :: Seq Word }
 makeLenses ''Mem
 
 data St = St { _programCount :: Pc, _memory :: Mem }
@@ -38,11 +37,11 @@ readInput :: IO String
 readInput = readFile "inputs/day-2"
 
 parse :: String -> Mem
-parse = Mem . Map.fromList . zip (map Pos [0 ..]) . fmap read . splitOn ","
+parse = Mem . Seq.fromList . fmap read . splitOn ","
 
 runWithArgs :: Word -> Word -> Mem -> Word
 runWithArgs a b =
-    evalState (store (Pos 1) a >> store (Pos 2) b >> eval) . St (Pc (Pos 0))
+    evalState (store (Pos 1) a >> store (Pos 2) b >> eval) . St (Pc 0)
 
 eval :: Eval Word
 eval = step >>= \case
@@ -59,27 +58,28 @@ step = do
 nextInstr :: Eval Instr
 nextInstr = do
     St (Pc pc) (Mem mem) <- get
-    case (mem Map.! pc) of
-        1 -> binop Add pc mem
-        2 -> binop Mul pc mem
+    let pc' = fromIntegral pc
+    case (Seq.index mem pc') of
+        1 -> binop Add pc' mem
+        2 -> binop Mul pc' mem
         99 -> incrPc 1 $> Halt
         _ -> error "Undefined opcode"
   where
-    binop f (Pos pc) mem =
+    binop f pc mem =
         let
-            i = Pos (mem Map.! (Pos (pc + 1)))
-            j = Pos (mem Map.! (Pos (pc + 2)))
-            dst = Pos (mem Map.! (Pos (pc + 3)))
+            i = Pos (Seq.index mem (pc + 1))
+            j = Pos (Seq.index mem (pc + 2))
+            dst = Pos (Seq.index mem (pc + 3))
         in incrPc 4 $> f i j dst
 
 incrPc :: Word -> Eval ()
-incrPc = modifying (programCount . unPc . unPos) . (+)
+incrPc = modifying (programCount . unPc) . (+)
 
 store :: Pos -> Word -> Eval ()
-store i = modifying (memory . unMem) . Map.insert i
+store (Pos i) = modifying (memory . unMem) . Seq.update (fromIntegral i)
 
 load :: Pos -> Eval Word
-load i = use (memory . unMem . to (Map.! i))
+load (Pos i) = use (memory . unMem . to (flip Seq.index (fromIntegral i)))
 
 -- Part 2
 
