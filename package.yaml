@@ -12,6 +12,8 @@ extra-source-files:
 dependencies:
 - base
 - split
+- mtl
+- microlens-platform
 
 library:
   source-dirs: src
