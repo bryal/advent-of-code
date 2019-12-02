@@ -7,18 +7,21 @@ import Control.Applicative
 import Data.Functor
 import Data.List.Split
 import Lens.Micro.Platform (makeLenses, use, to, modifying)
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
 
-newtype Pos = Pos Word
+newtype Pos = Pos { _unPos :: Word } deriving (Ord, Eq)
+makeLenses ''Pos
 
 data Instr
     = Add Pos Pos Pos
     | Mul Pos Pos Pos
     | Halt
 
-newtype Pc = Pc { _unPc :: Word}
+newtype Pc = Pc { _unPc :: Pos }
 makeLenses ''Pc
 
-newtype Mem = Mem { _unMem :: [Word]}
+newtype Mem = Mem { _unMem :: Map Pos Word }
 makeLenses ''Mem
 
 data St = St { _programCount :: Pc, _memory :: Mem }
@@ -35,11 +38,11 @@ readInput :: IO String
 readInput = readFile "inputs/day-2"
 
 parse :: String -> Mem
-parse = Mem . fmap read . splitOn ","
+parse = Mem . Map.fromList . zip (map Pos [0 ..]) . fmap read . splitOn ","
 
 runWithArgs :: Word -> Word -> Mem -> Word
 runWithArgs a b =
-    evalState (store (Pos 1) a >> store (Pos 2) b >> eval) . St (Pc 0)
+    evalState (store (Pos 1) a >> store (Pos 2) b >> eval) . St (Pc (Pos 0))
 
 eval :: Eval Word
 eval = step >>= \case
@@ -56,25 +59,27 @@ step = do
 nextInstr :: Eval Instr
 nextInstr = do
     St (Pc pc) (Mem mem) <- get
-    case (drop (fromIntegral pc) mem) of
-        1 : i : j : dst : _ -> incrPc 4 $> Add (Pos i) (Pos j) (Pos dst)
-        2 : i : j : dst : _ -> incrPc 4 $> Mul (Pos i) (Pos j) (Pos dst)
-        99 : _ -> incrPc 1 $> Halt
-        _ -> error "Invalid instruction"
+    case (mem Map.! pc) of
+        1 -> binop Add pc mem
+        2 -> binop Mul pc mem
+        99 -> incrPc 1 $> Halt
+        _ -> error "Undefined opcode"
+  where
+    binop f (Pos pc) mem =
+        let
+            i = Pos (mem Map.! (Pos (pc + 1)))
+            j = Pos (mem Map.! (Pos (pc + 2)))
+            dst = Pos (mem Map.! (Pos (pc + 3)))
+        in incrPc 4 $> f i j dst
 
 incrPc :: Word -> Eval ()
-incrPc = modifying (programCount . unPc) . (+)
+incrPc = modifying (programCount . unPc . unPos) . (+)
 
 store :: Pos -> Word -> Eval ()
-store (Pos i) = modifying (memory . unMem) . store' i
-  where
-    store' i x mem = case (i, mem) of
-        (0, _ : ys) -> x : ys
-        (_, y : ys) -> y : store' (i - 1) x ys
-        _ -> error "store"
+store i = modifying (memory . unMem) . Map.insert i
 
 load :: Pos -> Eval Word
-load (Pos i) = use (memory . unMem . to (!! fromIntegral i))
+load i = use (memory . unMem . to (Map.! i))
 
 -- Part 2
 
