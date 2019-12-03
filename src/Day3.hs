@@ -3,7 +3,6 @@
 module Day3 (part1, part2) where
 
 import Data.List.Split
-import Data.List
 import qualified Data.Map as Map
 
 import Lib
@@ -23,22 +22,23 @@ type Path = [(Point, Length)]
 -- Part 1
 
 part1 :: IO Int
-part1 = fmap part1' readInput
+part1 = fmap (closestIntersectionBy manhattanDist) readInput
 
 readInput :: IO String
 readInput = readFile "inputs/day-3"
 
-part1' :: String -> Int
-part1' =
-    manhattanDist
-        . head
-        . sortOn manhattanDist
-        . map fst
-        . uncurry fastIntersect
-        . parse
+manhattanDist :: (Point, (Length, Length)) -> Int
+manhattanDist ((Point x y), _) = abs x + abs y
 
-parse :: String -> (Path, Path)
-parse = both (coveredPoints . parseMoves) . head2 . lines
+closestIntersectionBy
+    :: Ord a => ((Point, (Length, Length)) -> a) -> String -> a
+closestIntersectionBy f =
+    minimum
+        . map f
+        . uncurry fastIntersect
+        . both (coveredPoints . parseMoves)
+        . head2
+        . lines
 
 parseMoves :: String -> [Move]
 parseMoves = map parseMove . splitOn ","
@@ -65,9 +65,6 @@ coveredPoints = tail . scanl move ((Point 0 0), 0) . (interpolate =<<)
 addPoint :: Point -> (Int, Int) -> Point
 addPoint (Point x y) (dx, dy) = Point (x + dx) (y + dy)
 
-manhattanDist :: Point -> Int
-manhattanDist (Point x y) = abs x + abs y
-
 -- | O(n * log n), unlike Data.List.intersect, which is O(n^2)
 fastIntersect :: Path -> Path -> [(Point, (Length, Length))]
 fastIntersect p q =
@@ -76,7 +73,7 @@ fastIntersect p q =
 -- Part 2
 
 part2 :: IO Int
-part2 = fmap part2' readInput
+part2 = fmap (closestIntersectionBy combinedPathLength) readInput
 
-part2' :: String -> Int
-part2' = minimum . map (uncurry (+) . snd) . uncurry fastIntersect . parse
+combinedPathLength :: (Point, (Length, Length)) -> Length
+combinedPathLength = uncurry (+) . snd
