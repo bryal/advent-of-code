@@ -3,6 +3,7 @@
 module Day5 (part1, part2) where
 
 import Control.Monad.State
+import Control.Monad.Writer
 import Control.Applicative
 import Data.List.Split
 import Lens.Micro.Platform (makeLenses, use, to, modifying, (<<%=), assign)
@@ -15,20 +16,16 @@ newtype Addr = Addr Int deriving (Ord, Eq)
 type Pc = Int
 type Mem = Seq Int
 
-data St = St { _pc :: Pc, _mem :: Mem }
+data St = St { _pc :: Pc, _inp :: [Int], _mem :: Mem }
 makeLenses ''St
 
-type Eval a = StateT St IO a
+type Eval a = StateT St (WriterT [Int] IO) a
 
-part1 :: IO Int
-part1 = do
-    putStrLn "Enter \"1\" at first prompt"
-    (run . parse) =<< readInput
+part1 :: IO [Int]
+part1 = (run [1] . parse) =<< readInput
 
-part2 :: IO Int
-part2 = do
-    putStrLn "Enter \"5\" at first prompt"
-    (run . parse) =<< readInput
+part2 :: IO [Int]
+part2 = (run [5] . parse) =<< readInput
 
 readInput :: IO String
 readInput = readFile "inputs/day-5"
@@ -36,15 +33,15 @@ readInput = readFile "inputs/day-5"
 parse :: String -> Mem
 parse = Seq.fromList . fmap read . splitOn ","
 
-run :: Mem -> IO Int
-run = evalStateT eval . St 0
+run :: [Int] -> Mem -> IO [Int]
+run = execWriterT . evalStateT eval .* St 0
 
-eval :: Eval Int
+eval :: Eval ()
 eval = step >>= \case
-    Just x -> pure x
-    Nothing -> eval
+    True -> pure ()
+    False -> eval
 
-step :: Eval (Maybe Int)
+step :: Eval Bool
 step = do
     (opcode, modes) <- nextInstr
     let binop' = binop (modes !! 0) (modes !! 1)
@@ -60,7 +57,7 @@ step = do
         8 -> binop' (fromEnum .* (==))
         99 -> pure ()
         _ -> error "Undefined opcode"
-    if opcode == 99 then fmap Just (load (Addr 0)) else pure Nothing
+    pure (if opcode == 99 then True else False)
   where
     nextInstr = fmap (\x -> (extractOpcode x, extractModes x)) next
     extractOpcode x = mod x 100
@@ -71,11 +68,10 @@ step = do
         dst <- nextAddr
         store dst v
     input = do
-        v <- lift (putStr "input> " >> fmap (read @Int) getLine)
+        i <- fmap head (inp <<%= tail)
         dst <- nextAddr
-        store dst v
-    output mode =
-        getArg mode >>= \x -> lift (putStrLn ("output: " ++ show x))
+        store dst i
+    output mode = tell . pure =<< getArg mode
     jmpIf amode bmode pred = do
         (a, b) <- liftA2 (,) (getArg amode) (getArg bmode)
         when (pred a) (assign pc b)
