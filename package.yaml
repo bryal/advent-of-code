@@ -16,6 +16,7 @@ dependencies:
 - microlens-platform
 - containers
 - composition
+- vector
 
 library:
   source-dirs: src
