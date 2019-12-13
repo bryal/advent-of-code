@@ -6,6 +6,8 @@ import Data.List.Split
 import qualified Data.Map as Map
 
 import Lib
+import Vec
+
 
 data Dir
     = DUp
@@ -15,20 +17,21 @@ data Dir
     deriving Show
 
 type Move = (Dir, Int)
-data Point = Point Int Int deriving (Eq, Ord)
+type Point = Vec2 Int
 type Length = Int
 type Path = [(Point, Length)]
 
--- Part 1
 
 part1 :: IO Int
 part1 = fmap (closestIntersectionBy manhattanDist) readInput
+    where manhattanDist = sum . abs . fst
+
+part2 :: IO Int
+part2 = fmap (closestIntersectionBy combinedPathLength) readInput
+    where combinedPathLength = uncurry (+) . snd
 
 readInput :: IO String
 readInput = readFile "inputs/day-3"
-
-manhattanDist :: (Point, (Length, Length)) -> Int
-manhattanDist ((Point x y), _) = abs x + abs y
 
 closestIntersectionBy
     :: Ord a => ((Point, (Length, Length)) -> a) -> String -> a
@@ -52,28 +55,17 @@ parseMoves = map parseMove . splitOn ","
         _ -> error "parseDir"
 
 coveredPoints :: [Move] -> Path
-coveredPoints = tail . scanl move ((Point 0 0), 0) . (interpolate =<<)
+coveredPoints = tail . scanl move ((Vec2 0 0), 0) . (interpolate =<<)
   where
     move (p, l) d = (move' p d, l + 1)
-    move' p d = addPoint p $ case d of
-        DUp -> (0, 1)
-        DDown -> (0, -1)
-        DLeft -> (-1, 0)
-        DRight -> (1, 0)
+    move' p d = p + case d of
+        DUp -> Vec2 0 1
+        DDown -> Vec2 0 (-1)
+        DLeft -> Vec2 (-1) 0
+        DRight -> Vec2 1 0
     interpolate (d, n) = replicate n d
-
-addPoint :: Point -> (Int, Int) -> Point
-addPoint (Point x y) (dx, dy) = Point (x + dx) (y + dy)
 
 -- | O(n * log n), unlike Data.List.intersect, which is O(n^2)
 fastIntersect :: Path -> Path -> [(Point, (Length, Length))]
 fastIntersect p q =
     Map.toList (Map.intersectionWith (,) (Map.fromList p) (Map.fromList q))
-
--- Part 2
-
-part2 :: IO Int
-part2 = fmap (closestIntersectionBy combinedPathLength) readInput
-
-combinedPathLength :: (Point, (Length, Length)) -> Length
-combinedPathLength = uncurry (+) . snd

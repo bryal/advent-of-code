@@ -64,8 +64,3 @@ bfs' visited as b os =
                     (as' >< Seq.fromList (map (, l + 1) (os Map.! a)))
                     b
                     os
-
-viewl' :: Seq a -> (a, Seq a)
-viewl' xs = case Seq.viewl xs of
-    Seq.EmptyL -> error "viewl' of empty Seq"
-    x Seq.:< xs' -> (x, xs')

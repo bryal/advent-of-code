@@ -4,7 +4,9 @@ module Day8 (part1, part2) where
 
 import Data.List.Split
 import Data.List
+
 import Lib
+
 
 part1 :: IO Int
 part1 = fmap

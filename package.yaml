@@ -17,6 +17,7 @@ dependencies:
 - containers
 - composition
 - vector
+- megaparsec
 
 library:
   source-dirs: src
