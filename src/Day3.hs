@@ -23,8 +23,7 @@ type Path = [(Point, Length)]
 
 
 part1 :: IO Int
-part1 = fmap (closestIntersectionBy manhattanDist) readInput
-    where manhattanDist = sum . abs . fst
+part1 = fmap (closestIntersectionBy (manhattan . fst)) readInput
 
 part2 :: IO Int
 part2 = fmap (closestIntersectionBy combinedPathLength) readInput

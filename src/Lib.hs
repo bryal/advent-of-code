@@ -1,6 +1,16 @@
 {-# LANGUAGE LambdaCase #-}
 
-module Lib (both, head2, head3, minimumOn, maximumOn, viewl', everyNth) where
+module Lib
+    ( both
+    , head2
+    , head3
+    , minimumOn
+    , maximumOn
+    , viewl'
+    , everyNth
+    , bsearchIntMax
+    )
+where
 
 import Data.Bifunctor
 import Data.List
@@ -31,3 +41,10 @@ everyNth :: Int -> [a] -> [a]
 everyNth n = \case
     a : as -> a : everyNth n (drop (n - 1) as)
     _ -> []
+
+bsearchIntMax :: (Int -> Bool) -> Int -> Int -> Int
+bsearchIntMax p low high = if low < high - 1
+    then
+        let mid = low + div (high - low) 2
+        in uncurry (bsearchIntMax p) $ if p mid then (mid, high) else (low, mid)
+    else if p high then high else low

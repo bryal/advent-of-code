@@ -1,4 +1,4 @@
-module Vec (Vec3(..), Vec2(..)) where
+module Vec (Vec3(..), Vec2(..), manhattan) where
 
 import Control.Applicative
 
@@ -55,3 +55,6 @@ instance Monad Vec2 where
             Vec2 xa _ = f x
             Vec2 _ yb = f y
         in Vec2 xa yb
+
+manhattan :: Num a => Vec2 a -> a
+manhattan = sum . abs

@@ -1,6 +1,15 @@
-{-# LANGUAGE LambdaCase, TemplateHaskell, TypeApplications #-}
+{-# LANGUAGE LambdaCase, TemplateHaskell, TypeApplications, FlexibleContexts
+           , TupleSections #-}
 
-module Intcode (parseIntcode, runIntcode, evalIntcode, Mem) where
+module Intcode
+    ( parseIntcode
+    , runIntcode
+    , evalIntcode
+    , Mem
+    , stepIntcode
+    , Continuation(..)
+    )
+where
 
 import Control.Monad.State
 import Control.Monad.Writer
@@ -10,6 +19,8 @@ import Data.Sequence (Seq)
 import Data.Composition
 import Data.List.Split
 import qualified Data.Sequence as Seq
+import Data.Functor
+import Data.Bifunctor
 
 
 newtype Addr = Addr Int deriving (Ord, Eq)
@@ -17,10 +28,16 @@ newtype Addr = Addr Int deriving (Ord, Eq)
 type Pc = Int
 type Mem = Seq Int
 
-data St = St { _pc :: Pc, _base :: Addr, _inp :: [Int], _mem :: Mem }
-makeLenses ''St
+type Mode = Int
 
-type Intcode a = StateT St (Writer [Int]) a
+data Flag = Continue | Halt | Input Mode
+
+newtype Continuation = Cont (Int -> ((Mem, [Int]), Maybe Continuation))
+
+data IntcodeSt = IntcodeSt { _pc :: Pc, _base :: Addr, _mem :: Mem }
+makeLenses ''IntcodeSt
+
+type Intcode a = WriterT [Int] (State IntcodeSt) a
 
 
 parseIntcode :: String -> Mem
@@ -29,17 +46,39 @@ parseIntcode s =
     in m Seq.>< Seq.fromFunction (8000 - Seq.length m) (const 0)
 
 runIntcode :: [Int] -> Mem -> (Mem, [Int])
-runIntcode = runWriter . fmap _mem . execStateT multistep .* St 0 (Addr 0)
+runIntcode inps pgm =
+    let
+        run is = \case
+            ((_, outs), Just (Cont cont)) ->
+                second (outs ++) (run (tail is) (cont (head is)))
+            (r, Nothing) -> r
+    in run inps (stepIntcode pgm)
+
+-- | Run the Intcode program until it asks for input or halts
+stepIntcode :: Mem -> ((Mem, [Int]), Maybe Continuation)
+stepIntcode pgm = evalState stepIntcode' (IntcodeSt 0 (Addr 0) pgm)
+  where
+    stepIntcode' = do
+        (r, outs) <- runWriterT multistep
+        m <- use mem
+        fmap ((m, outs), ) $ case r of
+            Nothing -> pure Nothing
+            Just mode -> do
+                st <- get
+                let cont inp =
+                        evalState (store inp mode *> stepIntcode') st
+                pure (Just (Cont cont))
 
 evalIntcode :: [Int] -> Mem -> [Int]
 evalIntcode = snd .* runIntcode
 
-multistep :: Intcode ()
+multistep :: Intcode (Maybe Mode)
 multistep = step >>= \case
-    True -> pure ()
-    False -> multistep
+    Continue -> multistep
+    Halt -> pure Nothing
+    Input mode -> pure (Just mode)
 
-step :: Intcode Bool
+step :: Intcode Flag
 step = do
     (opcode, modes) <- nextInstr
     let binop' = binop (modes !! 0) (modes !! 1) (modes !! 2)
@@ -54,34 +93,46 @@ step = do
         7 -> binop' (fromEnum .* (<))
         8 -> binop' (fromEnum .* (==))
         9 -> adjustBase (modes !! 0)
-        99 -> pure ()
+        99 -> pure Halt
         _ -> error "Undefined opcode"
-    pure (if opcode == 99 then True else False)
   where
     nextInstr = fmap (\x -> (extractOpcode x, extractModes x)) next
     extractOpcode x = mod x 100
     extractModes x = map (\n -> mod (div x (10 ^ n)) 10) [2 :: Int ..]
-    next = load . Addr =<< (pc <<%= (+ 1))
     binop amode bmode cmode f = do
         v <- liftA2 f (getArg amode) (getArg bmode)
         store v cmode
-    input mode = do
-        i <- fmap head (inp <<%= tail)
-        store i mode
-    output mode = tell . pure =<< getArg mode
-    jmpIf amode bmode pred = do
+        pure Continue
+    input mode = pure (Input mode)
+        -- do
+        -- i <- fmap head (inp <<%= tail)
+        -- store i mode
+    output mode = (tell . pure =<< getArg mode) $> Continue
+    jmpIf amode bmode pred' = do
         (a, b) <- liftA2 (,) (getArg amode) (getArg bmode)
-        when (pred a) (assign pc b)
-    adjustBase mode = modifying base =<< fmap addAddr (getArg mode)
-    store v mode =
-        getAddr mode >>= \(Addr i) -> modifying mem (Seq.update i v)
-    load (Addr i) = use (mem . to (flip Seq.index i)) :: Intcode Int
+        when (pred' a) (assign pc b)
+        pure Continue
+    adjustBase mode =
+        (modifying base =<< fmap addAddr (getArg mode)) $> Continue
     getArg = \case
         1 -> next -- Immediate mode
         n -> load =<< getAddr n
-    getAddr = \case
-        0 -> fmap Addr next -- Address mode
-        2 -> relativeBase =<< next -- Relative mode
-        _ -> error "getAddr"
-    relativeBase x = use (base . to (addAddr x)) :: Intcode Addr
-    addAddr b (Addr a) = (Addr (a + b))
+
+store :: MonadState IntcodeSt m => Int -> Mode -> m ()
+store v mode = getAddr mode >>= \(Addr i) -> modifying mem (Seq.update i v)
+
+getAddr :: MonadState IntcodeSt m => Mode -> m Addr
+getAddr = \case
+    0 -> fmap Addr next -- Address mode
+    2 -> relativeBase =<< next -- Relative mode
+    _ -> error "getAddr"
+    where relativeBase x = use (base . to (addAddr x))
+
+next :: MonadState IntcodeSt m => m Int
+next = load . Addr =<< (pc <<%= (+ 1))
+
+load :: MonadState IntcodeSt m => Addr -> m Int
+load (Addr i) = use (mem . to (flip Seq.index i))
+
+addAddr :: Int -> Addr -> Addr
+addAddr b (Addr a) = (Addr (a + b))
