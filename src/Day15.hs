@@ -2,17 +2,16 @@
 
 module Day15 (part1, part2) where
 
-import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Functor
 import Data.Maybe
-import Data.Sequence (Seq)
+import Data.List
 import qualified Data.Sequence as Seq
-import Data.Either
 import Vec
 import Intcode
 
-type Pos = Vec2 Int
+type PathLength = Int
+type Tile = Int
 
 part1 :: IO Int
 part1 = fmap (fst . findO2System . parseIntcode) readInput
@@ -22,48 +21,40 @@ part2 = readInput <&> \s ->
     let
         pgm = parseIntcode s
         (_, o2Cont) = findO2System pgm
-    in fromLeft (error "multiple O2 systems?") (bfs o2Cont)
+        (_, _, l, _) = last (bfs o2Cont)
+    in l
 
-findO2System :: Mem -> (Int, Continuation)
+findO2System :: Mem -> (PathLength, Continuation)
 findO2System pgm =
-    let (_, startCont) = stepIntcode pgm
-    in fromRight (error "O2 system not found") (bfs (fromJust startCont))
-
--- | Breadth-first search to find either the time to fill the chamber with
---   oxygen (if starting in the position of the oxygen system), or the oxygen
---   system itself.
-bfs :: Continuation -> Either Int (Int, Continuation)
-bfs cont = bfs' Set.empty (Vec2 0 0, 0, cont) Seq.empty
-
-bfs'
-    :: Set Pos
-    -> (Pos, Int, Continuation)
-    -> Seq (Pos, Int, Continuation)
-    -> Either Int (Int, Continuation)
-bfs' visiteds (p, l, (Cont cont)) nexts =
     let
-        dirs = filter (not . flip Set.member visiteds . snd) $ zip
-            [1, 2, 3, 4]
-            (map (p +) [Vec2 0 1, Vec2 0 (-1), Vec2 (-1) 0, Vec2 1 0])
-        l' = l + 1
-        bfs'' = \case
-            [] -> Right []
-            (dir, q) : ds -> case cont dir of
-                ((_, [0]), _) -> bfs'' ds
-                ((_, [1]), Just cont') -> fmap ((q, l', cont') :) (bfs'' ds)
-                ((_, [2]), Just cont') -> Left cont'
-                _ -> error "unexpected case in bfs''"
-    in case bfs'' dirs of
-        Left cont' -> Right (l', cont')
-        Right ns -> case Seq.viewl (nexts Seq.>< Seq.fromList ns) of
-            Seq.EmptyL -> Left l
-            next Seq.:< nexts' -> bfs'
-                (Set.union
-                    (Set.fromList (p : (map (\(q, _, _) -> q) ns)))
-                    visiteds
+        (_, startCont) = stepIntcode pgm
+        xs = bfs (fromJust startCont)
+        (_, _, l, c) = fromJust (find (\(t, _, _, _) -> t == 2) xs)
+    in (l, c)
+
+bfs :: Continuation -> [(Tile, Vec2 Int, PathLength, Continuation)]
+bfs c = bfs' Set.empty (0, Vec2 0 0 :: Vec2 Int, 0, c) Seq.empty
+  where
+    bfs' visiteds (tile, p, l, Cont cont) nexts =
+        let
+            dirs = filter (not . flip Set.member visiteds . snd) $ zip
+                [1, 2, 3, 4]
+                (map (p +) [Vec2 0 1, Vec2 0 (-1), Vec2 (-1) 0, Vec2 1 0])
+            l' = l + 1
+            neighbours = filter (\(t, _, _, _) -> t /= 0) $ map
+                (\(dir, p') ->
+                    let ((_, tile'), cont') = cont dir
+                    in (head tile', p', l', fromJust cont')
                 )
-                next
-                nexts'
+                dirs
+            visiteds' = Set.union
+                (Set.fromList (p : map (\(_, p', _, _) -> p') neighbours))
+                visiteds
+        in
+            (tile, p, l, Cont cont)
+                : case Seq.viewl (nexts Seq.>< Seq.fromList neighbours) of
+                    Seq.EmptyL -> []
+                    next Seq.:< nexts' -> bfs' visiteds' next nexts'
 
 readInput :: IO String
 readInput = readFile "inputs/day-15"
