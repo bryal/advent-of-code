@@ -21,18 +21,18 @@ part2 = readInput <&> \s ->
     let
         pgm = parseIntcode s
         (_, o2Cont) = findO2System pgm
-        (_, _, l, _) = last (bfs o2Cont)
+        (_, l, _) = last (bfs o2Cont)
     in l
 
 findO2System :: Mem -> (PathLength, Continuation)
 findO2System pgm =
     let
         (_, startCont) = stepIntcode pgm
-        xs = bfs (fromJust startCont)
-        (_, _, l, c) = fromJust (find (\(t, _, _, _) -> t == 2) xs)
+        (_, l, c) =
+            fromJust (find (\(t, _, _) -> t == 2) (bfs (fromJust startCont)))
     in (l, c)
 
-bfs :: Continuation -> [(Tile, Vec2 Int, PathLength, Continuation)]
+bfs :: Continuation -> [(Tile, PathLength, Continuation)]
 bfs c = bfs' Set.empty (0, Vec2 0 0 :: Vec2 Int, 0, c) Seq.empty
   where
     bfs' visiteds (tile, p, l, Cont cont) nexts =
@@ -51,7 +51,7 @@ bfs c = bfs' Set.empty (0, Vec2 0 0 :: Vec2 Int, 0, c) Seq.empty
                 (Set.fromList (p : map (\(_, p', _, _) -> p') neighbours))
                 visiteds
         in
-            (tile, p, l, Cont cont)
+            (tile, l, Cont cont)
                 : case Seq.viewl (nexts Seq.>< Seq.fromList neighbours) of
                     Seq.EmptyL -> []
                     next Seq.:< nexts' -> bfs' visiteds' next nexts'
