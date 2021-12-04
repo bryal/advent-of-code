@@ -15,10 +15,10 @@
                  (zip ns (skip (cast 1) ns)))))
 
 ;; Sliding windows over an iterator, each of width `n`
-(define: (windows n)
-    (forall (a) (Fun Nat (Iter a) (Iter (Array a))))
-  (unfoldr (fun (xs)
-             (let1 window (array/collect (take (cast n) xs))
-               (if (< (array/length window) n)  ; At the end
-                   None
-                 (Some [window (skip (cast 1) xs)]))))))
+;; (define: (windows n)
+;;     (forall (a) (Fun Nat (Iter a) (Iter (Array a))))
+;;   (unfoldr (fun (xs)
+;;              (let1 window (array/collect (take (cast n) xs))
+;;                (if (< (array/length window) n)  ; At the end
+;;                    None
+;;                  (Some [window (skip (cast 1) xs)]))))))

@@ -1,0 +1,50 @@
+(import std)
+
+(define main
+  (do io/bind
+      (<- input (io/map unwrap! (read-file "inputs/day4.txt")))
+      (let (([draws boards] (map-two parse-draws parse-boards
+                                     (unwrap! (string/split-first-line input))))
+            (scores (play draws (array/iter boards)))))
+      (display (str-append "Part 1: first to win = " (show-int (array/first! scores))))
+      (display (str-append "Part 2: last to win = " (show-int (array/last! scores))))))
+
+(define (parse-draws s)
+  (map (<o unwrap! parse-int) (string/splits-on "," s)))
+
+(define: (parse-boards s)
+    (Fun Str (Array (Array (Maybe Int))))
+  (array/collect
+   (map (fun (c) (array/collect
+                  (map parse-int
+                       (flat-map words (skip (to-nat 1) (array/iter c))))))
+        (iter/chunks (to-nat 6) (lines s)))))
+
+(define (play draws boards)
+  (car (foldl (fun ([scores1 boards] draw)
+                (let1 [scores2 boards'] (mark-boards draw boards)
+                  [(array/append scores1 scores2) (list/iter boards')]))
+              [array/nil boards]
+              draws)))
+
+(define (mark-boards x bs)
+  (map-car (<o (merge-sort int/cmp) array/collect-list)
+           (partition-eithers (map (mark-board x) bs))))
+
+(define (mark-board x b)
+  (match (array/find-by (maybe/= = (Some x)) b)
+    (case (Some i) (let1 b' (array/set! i None b)
+                     (if (bingo? (to-int i) b')
+                         (Left (score x b'))
+                       (Right b'))))
+    (case None (Right b))))
+
+(define (bingo? i b)
+  (define (winning-line? is) (all none? (map (fun (i) (array/lookup! (to-nat i) b)) is)))
+  (let ((row-is (take 5 (range-from (* (/ i 5) 5))))
+        (col-is (map (fun (j) (+ (rem i 5) (* 5 j))) (range 0 4))))
+    (or (winning-line? row-is)
+        (winning-line? col-is))))
+
+(define (score x b)
+  (* x (sum (cat-maybes (array/iter b)))))
