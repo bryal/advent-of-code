@@ -25,7 +25,7 @@
                          (array/modify! (fun (n) (+ n (- (* 2 (index-bit i num)) 1)))
                                         (cast i)
                                         acc))
-                       (array/collect (take (cast width) (repeat 0)))
+                       (array/collect (take width (repeat 0)))
                        (iter/cartesian nums (xrange 0 (cast width)))))
         (gamma (foldl (fun (acc [i n]) (set-bit (cast i) (>= n 0) acc))
                       (to-nat 0)

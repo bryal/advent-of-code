@@ -23,7 +23,7 @@
               draws)))
 
 (define (mark-boards x bs)
-  (map-car (<o (merge-sort int/cmp) array/collect-list)
+  (map-car (<o (merge-sort num/cmp) array/collect-list)
            (partition-eithers (map (mark-board x) bs))))
 
 (define (mark-board x b)

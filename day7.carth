@@ -8,7 +8,7 @@
                         (string/splits-on ",")
                         (map (<o unwrap! parse-int))
                         array/collect
-                        (merge-sort int/cmp)))
+                        (merge-sort num/cmp)))
       (display (apps str-append "Part 1: " (show-int (total-fuel id (median crabs) crabs))))
       (display (apps str-append "Part 2: " (show-int (total-fuel sum-nats-to-n (mean crabs) crabs))))))
 

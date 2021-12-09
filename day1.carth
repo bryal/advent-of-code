@@ -8,17 +8,8 @@
       (display (show-nat (count-increases depths)))
       (display "Part 2:")
       (display (show-nat (count-increases (map (<o sum array/iter)
-                                               (windows (cast 3) depths)))))))
+                                               (iter/windows (to-nat 3) depths)))))))
 
 (define (count-increases ns)
   (count (filter (fun ([a b]) (> b a))
-                 (zip ns (skip (cast 1) ns)))))
-
-;; Sliding windows over an iterator, each of width `n`
-;; (define: (windows n)
-;;     (forall (a) (Fun Nat (Iter a) (Iter (Array a))))
-;;   (unfoldr (fun (xs)
-;;              (let1 window (array/collect (take (cast n) xs))
-;;                (if (< (array/length window) n)  ; At the end
-;;                    None
-;;                  (Some [window (skip (cast 1) xs)]))))))
+                 (zip ns (skip 1 ns)))))
