@@ -1,0 +1,45 @@
+(import std)
+
+(define main
+  (do io/bind
+      (<- input (io/map unwrap! (read-file "inputs/day9.txt")))
+      (let ((dim (string/length-bytes (iter/first! (lines input))))
+            (height-array (array/collect (map (flip - ascii-0) (flat-map string/bytes (lines input)))))
+            (heightmap (array/collect (array/chunks dim height-array)))
+            (low-points (filter-map (fun (pt)
+                                      (let ((h (array/lookup2d! pt heightmap))
+                                            (adjs (filter-map (flip array/lookup2d heightmap)
+                                                              (list/iter (adjecent-points pt)))))
+                                        (if (all (< h) adjs)  (Some pt)  None)))
+                                    (iter/cartesian (xrange (to-nat 0) (array/length heightmap))
+                                                    (xrange (to-nat 0) dim))))))
+      (display (str-append "Part 1: " (show-nat (part1 heightmap low-points))))
+      (display (str-append "Part 2: " (show-nat (part2 heightmap low-points))))))
+
+(define (part1 heightmap low-points)
+  (sum (map (apps <o inc to-nat (flip array/lookup2d! heightmap)) low-points)))
+
+(define (part2 heightmap low-points)
+  (define (cmp-pt [i1 j1] [i2 j2]) (match (num/cmp i1 i2) (case Eq (num/cmp j1 j2)) (case x x)))
+  (define (basin-size seen)
+    (fmatch (case LNil (set/count seen))
+            (case (LCons (Box [pt pts]))
+                  (if (set/member? cmp-pt pt seen)
+                      (basin-size seen pts)
+                    (if (= 9 (maybe' 9 to-int (array/lookup2d pt heightmap)))
+                        (basin-size seen pts)
+                      (basin-size (set/insert cmp-pt pt seen)
+                                  (list/append (adjecent-points pt) pts)))))))
+  (apps |> low-points
+        (map (<o (basin-size set/nil) list/singleton))
+        array/collect
+        (merge-sort num/cmp)
+        array/iter-rev
+        (take 3)
+        product))
+
+(define (adjecent-points [i j])
+  (list [(dec i)   j]
+        [i   (inc j)]
+        [(inc i)   j]
+        [i   (dec j)]))
