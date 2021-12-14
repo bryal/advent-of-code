@@ -1,0 +1,43 @@
+(import std)
+
+(data Instruction (FoldX Nat) (FoldY Nat))
+
+(define main
+  (do io/bind
+      (<- input (io/map unwrap! (read-file "inputs/day14.txt")))
+      (let (([template ls] (next! (lines input)))
+            (rules (array/set-multiple! (array/unsafe-uninit (to-nat (* 26 26)))
+                                        (map parse-rule (skip 1 ls))))))
+      (display (str-append "Part 1: " (show-nat (grow-polymer-from-template template rules 10))))
+      (display (str-append "Part 2: " (show-nat (grow-polymer-from-template template rules 40))))
+      ))
+
+(define (grow-polymer-from-template template rules nsteps)
+
+  (define (grow-pair-count-elems nsteps st [l1 l2])
+    (if (= nsteps 0)
+        st
+      (let ((r (array/lookup! (pair-to-ix l1 l2) rules))
+            (st (array/modify! inc (to-nat r) st))
+            (st (grow-pair-count-elems (- nsteps 1) st [l1 r])))
+        (grow-pair-count-elems (- nsteps 1) st [r l2]))))
+
+  (let ((template (array/map char-to-num (string/as-array template)))
+        (init-st (foldl (fun (a i) (array/modify! inc (to-nat i) a))
+                        (array/unsafe-uninit (to-nat 26)) (array/iter template)))
+        (pairs (map (fun (a) [(array/lookup! (to-nat 0) a) (array/lookup! (to-nat 1) a)])
+                    (array/windows (to-nat 2) template)))
+        (occurences (foldl (grow-pair-count-elems nsteps) init-st pairs))
+        (occ-max (maximum (array/iter occurences)))
+        (occ-min (minimum (filter (|> (to-nat 0) <) (array/iter occurences)))))
+    (- occ-max occ-min)))
+
+(define (parse-rule s)
+  (let ((l1 (string/nth-byte! (to-nat 0) s))
+        (l2 (string/nth-byte! (to-nat 1) s))
+        (r  (string/nth-byte! (to-nat 6) s)))
+    [(pair-to-ix (char-to-num l1) (char-to-num l2))
+     (char-to-num r)]))
+
+(define (char-to-num c) (- c ascii-A))
+(define (pair-to-ix n m) (+ (* (to-nat 26) (to-nat n)) (to-nat m)))
