@@ -1,0 +1,58 @@
+(import std)
+
+(define main
+  (do io/bind
+      (<- input (io/map unwrap! (read-file "inputs/day15.txt")))
+      (let ((width (string/length-bytes (iter/first! (lines input))))
+            (flat-array (array/collect (map (flip - ascii-0)
+                                            (flat-map string/bytes (lines input)))))
+            (grid (array/collect (array/chunks width flat-array)))
+            (start (pq/singleton [(to-nat 0) . [(to-nat 0) (to-nat 0)]]))))
+      (display (str-append "Part 1: " (show-nat (dijkstra grid))))
+      (display (str-append "Part 2: " (show-nat (part2 grid))))))
+
+(define (part2 grid)
+  (let ((dim (array/length grid))
+        (k (to-nat 5))
+        (big-dim (* k dim))
+        ((populate-big-ix ix) (let ((bi (/ ix big-dim))
+                                    (bj (rem ix big-dim))
+                                    (si (rem bi dim))
+                                    (sj (rem bj dim))
+                                    (delta (+ (/ bi dim) (/ bj dim))))
+                                (inc (rem (dec (+ (cast delta) (array/lookup2d! [si sj] grid))) (cast 9)))))
+        ([Unit flat] (array/build (fun (Unit ix) [Unit (populate-big-ix ix)])
+                                  Unit
+                                  (square big-dim)))
+        (grid' (array/collect (array/chunks (* (to-nat 5) dim) flat))))
+    (dijkstra grid')))
+
+(define (dijkstra grid)
+  (define dim (array/length grid))
+  (define end [(dec dim) (dec dim)])
+  (define (go risks pq)
+    (let1 [[risk . pt] pq] (pq/delete-min! least-risky pq)
+      (if (cmp/= cmp-pt pt end)
+          risk
+        (if (< risk (array/lookup2d! pt risks))
+            (go (array/mutate2d! pt risk risks)
+                (foldl (flip (pq/insert least-risky))
+                       pq
+                       (map (fun (ad) [(+ risk (to-nat (array/lookup2d! ad grid))) . ad])
+                            (adjecents dim pt))))
+          (go risks pq)))))
+  (go (array/map (array/map (const (to-nat -1))) grid)
+      (pq/singleton [(to-nat 0) . [(to-nat 0) (to-nat 0)]])))
+
+(define (least-risky [risk1 . _] [risk2 . _]) (num/cmp risk1 risk2))
+
+(define (cmp-pt [i1 j1] [i2 j2]) (match (num/cmp i1 i2) (case Eq (num/cmp j1 j2)) (case x x)))
+
+(define (adjecents dim [i j])
+  (apps iter/chain
+        (if (< i (dec dim))  (iter/once [(inc i) j]) iter/nil)
+        (if (< j (dec dim))  (iter/once [i (inc j)]) iter/nil)
+        (if (> i (to-nat 0)) (iter/once [(dec i) j]) iter/nil)
+        (if (> j (to-nat 0)) (iter/once [i (dec j)]) iter/nil)))
+
+(define (show-elem [risk . [i j]]) (apps str-append (show-nat risk) "@" (show-nat i) "," (show-nat j)))
