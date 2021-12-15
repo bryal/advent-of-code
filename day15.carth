@@ -6,10 +6,9 @@
       (let ((width (string/length-bytes (iter/first! (lines input))))
             (flat-array (array/collect (map (flip - ascii-0)
                                             (flat-map string/bytes (lines input)))))
-            (grid (array/collect (array/chunks width flat-array)))
-            (start (pq/singleton [(to-nat 0) . [(to-nat 0) (to-nat 0)]]))))
-      (display (str-append "Part 1: " (show-nat (dijkstra grid))))
-      (display (str-append "Part 2: " (show-nat (part2 grid))))))
+            (grid (array/collect (array/chunks width flat-array)))))
+      (display (str-append "Part 1: " (show-nat (to-nat (dijkstra grid)))))
+      (display (str-append "Part 2: " (show-nat (to-nat (part2 grid)))))))
 
 (define (part2 grid)
   (let ((dim (array/length grid))
@@ -30,21 +29,24 @@
 (define (dijkstra grid)
   (define dim (array/length grid))
   (define end [(dec dim) (dec dim)])
+  (define (cmp [weight1 . _] [weight2 . _]) (num/cmp weight1 weight2))
+
   (define (go risks pq)
-    (let1 [[risk . pt] pq] (pq/delete-min! least-risky pq)
+    (let1 [[risk . pt] pq] (pq/delete-min! cmp pq)
       (if (cmp/= cmp-pt pt end)
           risk
         (if (< risk (array/lookup2d! pt risks))
             (go (array/mutate2d! pt risk risks)
-                (foldl (flip (pq/insert least-risky))
+                (foldl (flip (pq/insert cmp))
                        pq
-                       (map (fun (ad) [(+ risk (to-nat (array/lookup2d! ad grid))) . ad])
+                       (map (fun (ad) (let1 drisk (to-n16 (array/lookup2d! ad grid))
+                                        [(+ risk drisk)
+                                         . ad]))
                             (adjecents dim pt))))
           (go risks pq)))))
-  (go (array/map (array/map (const (to-nat -1))) grid)
-      (pq/singleton [(to-nat 0) . [(to-nat 0) (to-nat 0)]])))
 
-(define (least-risky [risk1 . _] [risk2 . _]) (num/cmp risk1 risk2))
+  (go (array/map (array/map (const (to-n16 -1))) grid)
+      (pq/singleton [(to-n16 0) . [(to-nat 0) (to-nat 0)]])))
 
 (define (cmp-pt [i1 j1] [i2 j2]) (match (num/cmp i1 i2) (case Eq (num/cmp j1 j2)) (case x x)))
 
@@ -54,5 +56,3 @@
         (if (< j (dec dim))  (iter/once [i (inc j)]) iter/nil)
         (if (> i (to-nat 0)) (iter/once [(dec i) j]) iter/nil)
         (if (> j (to-nat 0)) (iter/once [i (dec j)]) iter/nil)))
-
-(define (show-elem [risk . [i j]]) (apps str-append (show-nat risk) "@" (show-nat i) "," (show-nat j)))
