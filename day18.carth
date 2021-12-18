@@ -1,0 +1,102 @@
+(import std)
+
+(data SfNum
+  (SfRegular Int)
+  (SfPair (Box [SfNum SfNum])))
+
+(define main
+  (do io/bind
+      (<- input (io/map unwrap! (read-file "inputs/day18.txt")))
+
+      (let1 nums (map parse-sf-num (lines input)))
+      (let1 [n ns] (next! nums))
+      (let1 final (foldl (<oo reduce sf-add) (reduce n) ns))
+
+      (display "Part 1:")
+      (display (show-sf-num final))
+      (display (show-int (magnitude final)))
+      (display "")
+
+      (display (str-append "Part 2: "
+                           (show-int (maximum (map (apps <o magnitude reduce (uncurry sf-add))
+                                                   (iter/cartesian nums nums))))))))
+
+(define magnitude
+  (fmatch (case (SfRegular x) x)
+          (case (SfPair (Box [l r])) (+ (* 3 (magnitude l)) (* 2 (magnitude r))))))
+
+(define sf-add mk-pair)
+
+(define (reduce sf)
+  (match (explode sf)
+    (case (Some sf') (reduce sf'))
+    (case None (match (split sf)
+                 (case (Some sf') (reduce sf'))
+                 (case None sf)))))
+
+(define split
+  (fmatch
+    (case (SfRegular x) (if (>= x 10)
+                            (Some (mk-pair (SfRegular (/ x 2)) (SfRegular (/ (inc x) 2))))
+                          None))
+    (case (SfPair (Box [l r]))
+          (maybe/map
+           (<o SfPair box)
+           (maybe/or (maybe/map (flip cons' r) (split l))
+                     (nonstrict
+                      (maybe/map (cons' l) (split r))))))))
+
+(define (explode sf)
+  (define (go nesting)
+    (fmatch
+      (case (SfRegular x) None)
+      (case (SfPair (Box [l r]))
+            (if (= nesting 4)
+                (Some [(SfRegular 0) (Some (regular! l)) (Some (regular! r))])
+              (maybe/or
+               (maybe/map (fun ([l' ladd radd])
+                            [(mk-pair l'
+                                      (maybe' r (fun (radd') (sf-map-leftmost (+ radd') r)) radd))
+                             ladd
+                             None])
+                          (go (inc nesting) l))
+               (nonstrict
+                (maybe/map (fun ([r' ladd radd])
+                             [(mk-pair (maybe' l (fun (ladd') (sf-map-rightmost (+ ladd') l)) ladd)
+                                       r')
+                              None
+                              radd])
+                           (go (inc nesting) r))))))))
+  (maybe/map car (go 0 sf)))
+
+(define (sf-map-leftmost f)
+  (fmatch (case (SfRegular x) (SfRegular (f x)))
+          (case (SfPair (Box [l r])) (mk-pair (sf-map-leftmost f l) r))))
+(define (sf-map-rightmost f)
+  (fmatch (case (SfRegular x) (SfRegular (f x)))
+          (case (SfPair (Box [l r])) (mk-pair l (sf-map-rightmost f r)))))
+
+(define (mk-pair l r) (SfPair (box [l r])))
+
+(define regular!
+  (fmatch (case (SfRegular x) x)
+          (case x (panic (str-append "regular!: not a regular number: " (show-sf-num x))))))
+
+(define show-sf-num
+  (fmatch (case (SfRegular x) (show-int x))
+          (case (SfPair (Box [l r]))
+                (apps str-append "[" (show-sf-num l) "," (show-sf-num r) "]"))))
+
+(define parse-sf-num
+  (define (p-sf-num inp)
+    (let1 (Parser p)
+        (parse/or (parse/map SfRegular parse/int)
+                  (parse/between (parse/string "[")
+                                 (parse/string "]")
+                                 (do parse/bind
+                                     (<- a (Parser p-sf-num))
+                                     (parse/string ",")
+                                     (<- b (Parser p-sf-num))
+                                     (parse/pure (SfPair (box [a b]))))))
+      (p inp)))
+  (parse! (Parser p-sf-num)))
