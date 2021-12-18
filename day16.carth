@@ -1,0 +1,163 @@
+(import std)
+
+(data Version (Version Nat8))
+
+(data PacketType
+  (Lit Int)
+  (Op Nat8 (Array Packet)))
+
+(data Packet (Packet Version PacketType))
+
+(define main
+  (do io/bind
+      run-part1-tests
+      (display "")
+      run-part2-tests
+      (display "")
+
+      (<- input (io/map unwrap! (read-file "inputs/day16.txt")))
+      (let1 packet (car (parse-packet (parse-bits input))))
+
+      (display (str-append "Part 1: " (show-int (version-sum packet))))
+      (display (str-append "Part 2: " (show-int (eval packet))))))
+
+(define (eval (Packet _ p))
+  (match p
+    (case (Lit x) x)
+    (case (Op op es)
+          (let1 xs (map eval (array/iter es))
+            (match (to-int op)
+              (case 0 (sum xs))
+              (case 1 (product xs))
+              (case 2 (minimum xs))
+              (case 3 (maximum xs))
+              (case 5 (let1 [x1 xs] (next! xs) (if (> x1 (iter/first! xs)) 1 0)))
+              (case 6 (let1 [x1 xs] (next! xs) (if (< x1 (iter/first! xs)) 1 0)))
+              (case _ (let1 [x1 xs] (next! xs) (if (= x1 (iter/first! xs)) 1 0))))))))
+
+(define btoi (fmatch (case True 1) (case False 0)))
+
+(define (version-sum (Packet (Version v) pt))
+  (+ (to-int v) (match pt
+                  (case (Lit _) 0)
+                  (case (Op _ subs) (sum (map version-sum (array/iter subs)))))))
+
+(define (parse-packet bits)
+  (let (([bver bits] (unwrap-or-else (fun (_) (panic "parse-packet: failed to get version bits"))
+                                     (array/split (cast 3) bits)))
+        (ver (: (bits-to-num bver) Nat8))
+        ([btyp bits] (unwrap-or-else (fun (_) (panic "parse-packet: failed to get type bits"))
+                                     (array/split (cast 3) bits)))
+        ([pt bits] (match (bits-to-num btyp)
+                     (case 4 (parse-lit bits))
+                     (case oid (parse-op (to-n8 oid) bits)))))
+    [(Packet (Version ver) pt) bits]))
+
+(define (parse-op oid bits)
+  (define (lt-n-bits? n [mbits _msubs]) (< mbits n))
+  (define (lt-n-subs? n [_mbits msubs]) (< msubs n))
+
+  (let (([len-type bits] (unwrap-or-else (fun (_) (panic "parse-op: failed to get len-type"))
+                                         (array/split-first bits)))
+        ([cont? bits] (if len-type
+                          (map-car (<o lt-n-subs? bits-to-num)
+                                   (unwrap-or-else (fun (_) (panic "parse-op: failed to get n subs"))
+                                                   (array/split (cast 11) bits)))
+                        (map-car (<o lt-n-bits? bits-to-num)
+                                 (unwrap-or-else (fun (_) (panic "parse-op: failed to get n bits"))
+                                                 (array/split (cast 15) bits)))))
+        ([subs bits] (parse-subs cont? [(to-nat 0) (to-nat 0)] bits)))
+    [(Op oid (array/collect-list subs)) bits]))
+
+(define (parse-subs cont? count' bits0)
+  (if (not (cont? count'))
+      [LNil bits0]
+    (let (([sub bits] (parse-packet bits0))
+          (sub-size (- (array/length bits0) (array/length bits)))
+          (count' (map-two (+ sub-size) inc count'))
+          ([subs bits] (parse-subs cont? count' bits)))
+      [(list/cons sub subs) bits])))
+
+(define (parse-lit bits)
+  (define (go acc bits)
+    (let (([cont? bits] (unwrap-or-else (fun (_) (panic "parse-lit: failed to get continue bit"))
+                                        (array/split-first bits)))
+          ([bs bits] (unwrap-or-else (fun (_) (panic "parse-lit: failed to split 4"))
+                                     (array/split (cast 4) bits)))
+          (acc (array/append acc bs)))
+      (if cont?
+          (go acc bits)
+        [(Lit (bits-to-num acc)) bits])))
+  (go array/nil bits))
+
+(define (bits-to-num bits)
+  (let1 inv (<o cast (- (- (array/length bits) (cast 1))))
+    (foldl (fun (x [i b]) (set-bit (inv i) b x)) (cast 0) (enumerate (array/iter bits)))))
+
+(define (show-packet (Packet (Version v) pt))
+  (define show-pt
+    (fmatch (case (Lit n) (show-int n))
+            (case (Op oid ps) (apps str-append
+                                    "op " (show-nat (cast oid))
+                                    " [" (string/concat (intersperse ", " (map show-packet (array/iter ps)))) "]"))))
+  (apps str-append "{version = " (show-nat (cast v)) ", " (show-pt pt) "}"))
+
+(define (parse-bits s)
+  (define (digit-bits c)
+    (let1 b (if (>= c ascii-A)
+                (+ (- c ascii-A) (cast 10))
+              (- c ascii-0))
+      (map (fun (i) (bit-set? (to-n8 (- 3 i)) b)) (xrange 0 4))))
+  (array/collect (flat-map digit-bits (string/bytes s))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; TESTING
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define run-part1-tests
+  (define tests1 (list ["D2FE28" 6]
+                       ["8A004A801A8002F478" 16]
+                       ["620080001611562C8802118E34" 12]
+                       ["C0015000016115A2E0802F182340" 23]
+                       ["A0016C880162017C3686B18A3D4780" 31]))
+  (do io/bind
+      (display "Running part 1 tests:")
+      (io/for (list/iter tests1)
+              (fun ([inp vsum-expected])
+                (do io/bind
+                    (<- p (parse-packet-debug inp))
+                    (let1 vsum-found (version-sum p))
+                    (display (apps str-append
+                                   (if (= vsum-expected vsum-found) "   OK ---- " "   ERR ### ")
+                                   "expected " (show-int vsum-expected)
+                                   ", found " (show-int vsum-found))))))))
+
+(define run-part2-tests
+  (define tests2 (list ["C200B40A82" 3]
+                       ["04005AC33890" 54]
+                       ["880086C3E88112" 7]
+                       ["CE00C43D881120" 9]
+                       ["D8005AC2A8F0" 1]
+                       ["F600BC2D8F" 0]
+                       ["9C005AC2F8F0" 0]
+                       ["9C0141080250320F1802104A08" 1]))
+  (do io/bind
+      (display "Running part 2 tests:")
+      (io/for (list/iter tests2)
+              (fun ([inp val-expected])
+                (do io/bind
+                    (<- p (parse-packet-debug inp))
+                    (let1 val-found (eval p))
+                    (display (apps str-append
+                                   (if (= val-expected val-found) "   OK ---- " "   ERR ### ")
+                                   "expected " (show-int val-expected)
+                                   ", found " (show-int val-found))))))))
+
+(define (parse-packet-debug inp)
+  (do io/bind
+      (display (str-append " " inp))
+      (let1 bits (parse-bits inp))
+      (display (str-append "    bits = " (array/show (<o show-int btoi) bits)))
+      (let1 [p _] (parse-packet bits))
+      (display (str-append "    packet = " (show-packet p)))
+      (io/pure p)))
