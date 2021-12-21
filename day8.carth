@@ -31,7 +31,7 @@
         ((decode pat)
          (let (((n x) (= (to-nat x) (string/length-bytes pat)))
                (s (set/collect num/cmp (string/bytes pat)))
-               ((isect-n m s') (= (to-nat m) (set/count (set/isect num/cmp s s')))))
+               ((isect-n m s') (= (to-nat m) (set/size (set/isect num/cmp s s')))))
            (cond ((and (n 6) (isect-n 1 (set/diff num/cmp s4 s1)))  0)
                  (     (n 2)                                1)
                  ((and (n 5) (isect-n 2 s4))                2)
@@ -50,10 +50,9 @@
 
 (define (parse-line s)
   (define segs (parse/take-bytes-while (<o not whitespace-byte?)))
-  (unwrap!
-   (parse (do parse/bind
+  (parse! (do parse/bind
               (<- as (parse/n-times (to-nat 10) (parse/thenl segs parse/space1)))
               (parse/string "|")
               (<- bs (parse/n-times (to-nat 4) (parse/thenr parse/space1 segs)))
               (parse/pure [as bs]))
-          (trim s))))
+          (trim s)))

@@ -27,11 +27,11 @@
                        ps)))))
 
 (define parse-line
-  (<o unwrap! (parse (do parse/bind
-                         (<- x1 parse/nat) (parse/string ",") (<- y1 parse/nat)
-                         (parse/string " -> ")
-                         (<- x2 parse/nat) (parse/string ",") (<- y2 parse/nat)
-                         (parse/pure [[(to-int x1) (to-int y1)] [(to-int x2) (to-int y2)]])))))
+  (parse! (do parse/bind
+              (<- x1 parse/nat) (parse/string ",") (<- y1 parse/nat)
+              (parse/string " -> ")
+              (<- x2 parse/nat) (parse/string ",") (<- y2 parse/nat)
+              (parse/pure [[(to-int x1) (to-int y1)] [(to-int x2) (to-int y2)]]))))
 
 (define (line-points [[x1 y1] [x2 y2]])
   (if (= x1 x2)

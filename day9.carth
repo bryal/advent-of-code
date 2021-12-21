@@ -22,7 +22,7 @@
 (define (part2 heightmap low-points)
   (define (cmp-pt [i1 j1] [i2 j2]) (match (num/cmp i1 i2) (case Eq (num/cmp j1 j2)) (case x x)))
   (define (basin-size seen)
-    (fmatch (case LNil (set/count seen))
+    (fmatch (case LNil (set/size seen))
             (case (LCons (Box [pt pts]))
                   (if (set/member? cmp-pt pt seen)
                       (basin-size seen pts)

@@ -6,7 +6,7 @@
 
 (define main
   (do io/bind
-      (<- input (io/map unwrap! (read-file "inputs/test.txt")))
+      (<- input (io/map unwrap! (read-file "inputs/day19.txt")))
       (let ((scanners (parse-scanners input))
             (transforms (scanner-transforms (first! scanners) (rest! scanners)))
             (scanners' (transform-scanners scanners transforms))))
@@ -22,7 +22,7 @@
     (+s (abs dx) (abs dy) (abs dz))))
 
 (define: (count-beacons scanners) (Fun (List Scanner) Nat)
-  (set/count (set/collect vec3/cmp (flat-map (<o list/iter scanner-beacons) (list/iter scanners)))))
+  (set/size (set/collect vec3/cmp (flat-map (<o list/iter scanner-beacons) (list/iter scanners)))))
 
 (define: (transform-scanners scanners transforms)
     (Fun (List Scanner) (Map Nat (List Transform)) (List Scanner))
@@ -42,7 +42,7 @@
         (list/cons tr (reduce' (map/lookup! num/cmp m trs)))))
     (map/collect num/cmp (map (map-cadr reduce') (map/iter trs))))
   (define (go trs targets)
-    (if (>= (map/count trs) n-tot)
+    (if (>= (map/size trs) n-tot)
         (reduce trs)
       (let (([target targets] (unwrap! (list/uncons targets)))
             (remaining (filter (apps <o not (flip (map/member? num/cmp) trs) scanner-id)
@@ -69,7 +69,7 @@
                                            set/iter)))
                    (filter-map (fun (dv)
                                  (let1 bs1'' (set/collect vec3/cmp (map (vec3/+ dv) (list/iter bs1')))
-                                   (if (>= (set/count (set/isect vec3/cmp bs1'' bs2')) (to-nat 12))
+                                   (if (>= (set/size (set/isect vec3/cmp bs1'' bs2')) (to-nat 12))
                                        (Some (Transform dv rot))
                                      None)))
                                translations)))
@@ -89,7 +89,7 @@
 (define (vec3/- (Vec3 x1 y1 z1) (Vec3 x2 y2 z2)) (Vec3 (- x1 x2) (- y1 y2) (- z1 z2)))
 
 (define (apply-transforms trs v) (foldl apply-transform v (list/iter trs)))
-(define: (apply-transform v (Transform transl rot)) (Fun Transform Vec3 Vec3)
+(define: (apply-transform v (Transform transl rot)) (Fun Vec3 Transform Vec3)
   (vec3/+ transl (apply-rot rot v)))
 
 (define (apply-rot rot v) (direction (rem rot 6) (roll (/ rot 6) v)))
