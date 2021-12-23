@@ -1,0 +1,158 @@
+(import std)
+
+(data Vec3 (Vec3 Int Int Int))
+(data Cube (Cube Vec3 Int))
+(data Cuboid (Cuboid Vec3 Vec3))
+
+(data Status On Off)
+
+(data Octree
+  (Ocleaf Cube Status)
+  (Octree Cube (Array Octree)))
+
+(define main
+  (do io/bind
+      (<- input (io/map unwrap! (read-file "inputs/test.txt")))
+      (let1 cmds (parse-commands input))
+      (let ((cmds' (filter-map (fun ([on? xs ys zs])
+                                 (if (any (<o (< 50) abs)
+                                          (list/iter (list (car xs) (cadr xs)
+                                                           (car ys) (cadr ys)
+                                                           (car zs) (cadr zs))))
+                                     None
+                                   (Some [on? xs ys zs])))
+                               cmds))))
+      (display (str-append "Part 1: " (show-int (count-ons (execute octree/new cmds')))))
+      (display (str-append "Part 2: " (show-int (count-ons (execute octree/new cmds)))))))
+
+(define execute
+  (foldl (fun (octree [on? [x1 x2] [y1 y2] [z1 z2]])
+           ((trace "executing command" set-status)
+            (Cuboid (Vec3 x1 y1 z1) (Vec3 x2 y2 z2)) (if on? On Off) octree))))
+
+(define (set-status region status octree)
+  (if (not (cube/contains region (octree/cube octree)))
+      (panic "region not contained in cube")
+    (if (maybe' False (cube/= (octree/cube octree)) (cuboid/as-cube region))
+        (Ocleaf (octree/cube octree) status)
+      (match octree
+        (case (Ocleaf c s)
+              (if (status/= s status)
+                  (Ocleaf c s)
+                (set-status region status (octree/subdivide c s))))
+        (case (Octree c subs)
+              (let1 subs (array/collect (zip-with (fmatch (case (Some subreg)
+                                                                (set-status subreg status))
+                                                          (case None id))
+                                                  (list/iter (cuboid/split (cube/midpoint c) region))
+                                                  (array/iter subs)))
+                (match (same-status-leaves subs)
+                  (case (Some s) (Ocleaf c s))
+                  (case None (Octree c subs)))))))))
+
+(define (cuboid/as-cube (Cuboid p1 p2))
+  (let1 (Vec3 dx dy dz) (vec3/- p2 p1)
+    (if (and (= dx dy) (= dy dz))
+        (Some (Cube p1 (inc dx)))
+      None)))
+
+(define (cuboid/split (Vec3 split-x split-y split-z) (Cuboid (Vec3 px1 py1 pz1) (Vec3 px2 py2 pz2)))
+  (define (split-dim a1 a2 amid)
+    (if (< a1 amid)
+        (if (>= a2 amid)
+            (list (Some [a1 (dec amid)]) (Some [amid a2]))
+          (list (Some [a1 a2]) None))
+      (list None (Some [a1 a2]))))
+  (do list/bind
+      (<- xs (split-dim px1 px2 split-x))
+      (<- ys (split-dim py1 py2 split-y))
+      (<- zs (split-dim pz1 pz2 split-z))
+      (list/singleton (do maybe/bind
+                          (<- [x1 x2] xs)
+                          (<- [y1 y2] ys)
+                          (<- [z1 z2] zs)
+                          (Some (Cuboid (Vec3 x1 y1 z1) (Vec3 x2 y2 z2)))))))
+
+(define (cuboid/show (Cuboid p1 p2)) (apps str-append "(Cuboid " (vec3/show p1) " " (vec3/show p2) ")"))
+
+(define (same-status-leaves subs)
+  (let1 ss (list/collect (filter-map leaf-status (array/iter subs)))
+    (if (/= (to-nat 8) (list/count ss))
+        None
+      (let1 [s0 ss] (list/uncons! ss)
+        (if (and (= (to-nat 8) (list/count ss)) (all (status/= s0) (list/iter ss)))
+            (Some s0)
+          None)))))
+
+(define leaf-status (fmatch (case (Ocleaf _ s) (Some s)) (case _ None)))
+
+(define: (status/= s1 s2) (Fun Status Status Bool) (= (: (transmute s1) Nat8) (transmute s2)))
+
+(define status/show (fmatch (case On "On") (case Off "Off")))
+
+(define (octree/subdivide c s)
+  (Octree c (array/map (flip Ocleaf s) (cube/subdivide c))))
+
+(define (cube/contains (Cuboid (Vec3 x1 y1 z1) (Vec3 x2 y2 z2)) (Cube (Vec3 px py pz) len))
+  (apps and
+        (>= x1 px) (>= y1 py) (>= z1 pz)
+        (< x2 (+ px len)) (< y2 (+ py len)) (< z2 (+ pz len))))
+
+(define (cube/subdivide (Cube (Vec3 x y z) len))
+  (let1 l (/ len 2)
+    ((<oo array/collect-list list/map)
+     (flip Cube l)
+     (list (Vec3 x       y       z      )
+           (Vec3 x       y       (+ z l))
+           (Vec3 x       (+ y l) z      )
+           (Vec3 x       (+ y l) (+ z l))
+           (Vec3 (+ x l) y       z      )
+           (Vec3 (+ x l) y       (+ z l))
+           (Vec3 (+ x l) (+ y l) z      )
+           (Vec3 (+ x l) (+ y l) (+ z l))))))
+
+(define (cube/midpoint (Cube c len)) (vec3/+ c (vec3/repeat (/ len 2))))
+
+(define (cube/volume (Cube _ len)) (*s len len len))
+
+(define (cube/= (Cube pos1 len1) (Cube pos2 len2)) (andalso (= len1 len2) (vec3/= pos1 pos2)))
+
+(define (cube/show (Cube pos len)) (apps str-append "(Cube " (vec3/show pos) " " (show-int len) ")"))
+
+(define (vec3/= v1 v2) (match (vec3/cmp v1 v2) (case Eq True) (case _ False)))
+(define (vec3/- (Vec3 x1 y1 z1) (Vec3 x2 y2 z2)) (Vec3 (- x1 x2) (- y1 y2) (- z1 z2)))
+(define (vec3/+ (Vec3 x1 y1 z1) (Vec3 x2 y2 z2)) (Vec3 (+ x1 x2) (+ y1 y2) (+ z1 z2)))
+
+(define (vec3/cmp (Vec3 x1 y1 z1) (Vec3 x2 y2 z2))
+  (match (num/cmp x1 x2)
+    (case Eq (match (num/cmp y1 y2)
+               (case Eq (num/cmp z1 z2))
+               (case x x)))
+    (case x x)))
+
+(define (vec3/show (Vec3 x y z)) (apps str-append "(Vec3 " (show-int x) " " (show-int y) " " (show-int z) ")"))
+
+(define octree/cube (fmatch (case (Ocleaf c _) c) (case (Octree c _) c)))
+
+(define octree/new (Ocleaf (Cube (vec3/repeat (neg (powi 2 17))) (powi 2 18)) Off))
+
+(define (vec3/repeat x) (Vec3 x x x))
+
+(define count-ons
+  (fmatch (case (Ocleaf cube On) (cube/volume cube))
+          (case (Ocleaf _ Off) 0)
+          (case (Octree bounds children)
+                (sum (map count-ons (array/iter children))))))
+
+(define parse-commands
+  (define prange
+    (parse/lift2 cons' parse/int (parse/thenr (parse/string "..") parse/int)))
+  (define pcmd
+    (do parse/bind
+        (<- on (parse/or (parse/thenr (parse/string "on")  (parse/pure True))
+                         (parse/thenr (parse/string "off") (parse/pure False))))
+        (parse/string " x=") (<- xs prange)
+        (parse/string ",y=") (<- ys prange)
+        (parse/string ",z=") (<- zs prange)
+        (parse/pure [on xs ys zs])))
+  (<o (map (parse! pcmd)) lines))
