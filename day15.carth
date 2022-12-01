@@ -1,56 +1,56 @@
 (import std)
 
-(define main
-  (do io/bind
-      (<- input (io/map unwrap! (read-file "inputs/day15.txt")))
-      (let ((width (string/length-bytes (iter/first! (lines input))))
-            (flat-array (array/collect (map (flip - ascii-0)
-                                            (flat-map string/bytes (lines input)))))
-            (grid (array/collect (array/chunks width flat-array)))))
-      (display (str-append "Part 1: " (show-nat (to-nat (dijkstra grid)))))
-      (display (str-append "Part 2: " (show-nat (to-nat (part2 grid)))))))
+(def main
+     (do io/bind
+         (<- input (io/map unwrap! (read-file "inputs/day15.txt")))
+         (let ((width (string/length-bytes (iter/first! (lines input))))
+               (flat-array (array/collect (map \(- # ascii-0)
+                                               (flat-map string/bytes (lines input)))))
+               (grid (array/collect (array/chunks width flat-array)))))
+         (display (str-append "Part 1: " (show-nat (to-nat (dijkstra grid)))))
+         (display (str-append "Part 2: " (show-nat (to-nat (part2 grid)))))))
 
-(define (part2 grid)
+(defun part2 [grid]
   (let ((dim (array/length grid))
         (k (to-nat 5))
         (big-dim (* k dim))
-        ((populate-big-ix ix) (let ((bi (/ ix big-dim))
-                                    (bj (rem ix big-dim))
-                                    (si (rem bi dim))
-                                    (sj (rem bj dim))
-                                    (delta (+ (/ bi dim) (/ bj dim))))
-                                (inc (rem (dec (+ (cast delta) (array/lookup2d! [si sj] grid))) (cast 9)))))
-        ([Unit flat] (array/build (fun (Unit ix) [Unit (populate-big-ix ix)])
+        (populate-big-ix (fun [ix] (let ((bi (/ ix big-dim))
+                                         (bj (rem ix big-dim))
+                                         (si (rem bi dim))
+                                         (sj (rem bj dim))
+                                         (delta (+ (/ bi dim) (/ bj dim))))
+                                     (inc (rem (dec (+ (cast delta) (array/lookup2d! [si sj] grid))) (cast 9))))))
+        ([Unit flat] (array/build (fun [Unit ix] [Unit (populate-big-ix ix)])
                                   Unit
                                   (square big-dim)))
         (grid' (array/collect (array/chunks (* (to-nat 5) dim) flat))))
     (dijkstra grid')))
 
-(define (dijkstra grid)
-  (define dim (array/length grid))
-  (define end [(dec dim) (dec dim)])
-  (define (cmp [weight1 . _] [weight2 . _]) (num/cmp weight1 weight2))
+(defun dijkstra [grid]
+  (def dim (array/length grid))
+  (def end [(dec dim) (dec dim)])
+  (defun cmp [[weight1 . _] [weight2 . _]] (num/cmp weight1 weight2))
 
-  (define (go risks pq)
+  (defun go [risks pq]
     (let1 [[risk . pt] pq] (pq/delete-min! cmp pq)
       (if (cmp/= cmp-pt pt end)
           risk
         (if (< risk (array/lookup2d! pt risks))
             (go (array/mutate2d! pt risk risks)
-                (foldl (flip (pq/insert cmp))
+                (foldl \(pq/insert cmp #1 #0)
                        pq
-                       (map (fun (ad) (let1 drisk (to-n16 (array/lookup2d! ad grid))
+                       (map (fun [ad] (let1 drisk (to-n16 (array/lookup2d! ad grid))
                                         [(+ risk drisk)
                                          . ad]))
                             (adjecents dim pt))))
           (go risks pq)))))
 
-  (go (array/map (array/map (const (to-n16 -1))) grid)
+  (go (array/map \(array/map (const (to-n16 -1)) #) grid)
       (pq/singleton [(to-n16 0) . [(to-nat 0) (to-nat 0)]])))
 
-(define (cmp-pt [i1 j1] [i2 j2]) (match (num/cmp i1 i2) (case Eq (num/cmp j1 j2)) (case x x)))
+(defun cmp-pt [[i1 j1] [i2 j2]] (match (num/cmp i1 i2) (case Eq (num/cmp j1 j2)) (case x x)))
 
-(define (adjecents dim [i j])
+(defun adjecents [dim [i j]]
   (apps iter/chain
         (if (< i (dec dim))  (iter/once [(inc i) j]) iter/nil)
         (if (< j (dec dim))  (iter/once [i (inc j)]) iter/nil)

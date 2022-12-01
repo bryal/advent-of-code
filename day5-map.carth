@@ -1,0 +1,49 @@
+(import std)
+(import map)
+
+(def main
+     (do io/bind
+         (<- input (io/map unwrap! (read-file "inputs/day5.txt")))
+         (let (([ortho-points diag-points]
+                (map-both list/iter
+                          (partition-eithers (flat-map (<o line-points parse-line) (lines input)))))
+               (ortho-freqs (map/collect-with-count point-cmp ortho-points))
+               (all-freqs (map/extend-with-count point-cmp ortho-freqs diag-points))))
+         ;; (display (show-nat (count (map/iter ortho-freqs))))
+         ;; (display (show-nat (map/height ortho-freqs)))
+         (display (str-append "Part 1: " (show-nat (count-intersections ortho-freqs))))
+         (display (str-append "Part 2: " (show-nat (count-intersections all-freqs))))
+         ))
+
+(defun count-intersections [ps]
+  (count (filter (fun [[_ y]] (<= (to-nat 2) y)) (map/iter ps)))
+
+  ;; (define (point-eq p1 p2) (match (point-cmp p1 p2) (case Eq True) (case _ False)))
+  ;; (let (([p0 ps] (next! (array/iter ps)))
+  ;;       ([p1 ps] (next! ps))
+  ;;       (init (if (point-eq p0 p1) 1 0)))
+  ;;   (car (deref (foldl (fun ((Box [n p0 p1]) p2)
+  ;;                        ;; Don't count more than one intersection when more than one duplicate
+  ;;                        (box [(if (and (point-eq p2 p1) (not (point-eq p2 p0))) (+ n 1) n) p1 p2]))
+  ;;                      (box [init p0 p1])
+  ;;                      ps))))
+  )
+
+(defun parse-line [s]
+  (parse! (do parse/bind
+              (<- x1 parse/nat) (parse/string ",") (<- y1 parse/nat)
+              (parse/string " -> ")
+              (<- x2 parse/nat) (parse/string ",") (<- y2 parse/nat)
+              (parse/pure [[(to-int x1) (to-int y1)] [(to-int x2) (to-int y2)]]))
+          s))
+
+(defun line-points [[[x1 y1] [x2 y2]]]
+  (if (= x1 x2)
+      (map Left (zip (repeat x1) (range (min y1 y2) (max y1 y2))))
+    (if (= y1 y2)
+        (map Left (zip (range (min x1 x2) (max x1 x2)) (repeat y1)))
+      (let ((mag (abs (- x2 x1))) (dx (sign (- x2 x1))) (dy (sign (- y2 y1))))
+        (map (fun [i] (Right [(+ x1 (* dx i)) (+ y1 (* dy i))])) (range 0 mag))))))
+
+(defun point-cmp [[x1 y1] [x2 y2]]
+  (match (num/cmp x1 x2) (case Lt Lt) (case Gt Gt) (case Eq (num/cmp y1 y2))))

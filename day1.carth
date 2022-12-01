@@ -1,15 +1,15 @@
 (import std)
 
-(define main
-  (do io/bind
-      (<- inp (io/map unwrap! (read-file "inputs/day1.txt")))
-      (let1 depths (map (<o unwrap! parse-nat) (lines inp)))
-      (display "Part 1:")
-      (display (show-nat (count-increases depths)))
-      (display "Part 2:")
-      (display (show-nat (count-increases (map (<o sum array/iter)
-                                               (iter/windows (to-nat 3) depths)))))))
+(def main
+     (do io/bind
+         (<- inp (io/map unwrap! (read-file "inputs/day1.txt")))
+         (let1 depths (map (<o unwrap! parse-nat) (lines inp)))
+         (display "Part 1:")
+         (display (show-nat (count-increases depths)))
+         (display "Part 2:")
+         (display (show-nat (count-increases (map \(sum (array/iter #))
+                                                  (iter/windows (to-nat 3) depths)))))))
 
-(define (count-increases ns)
-  (count (filter (fun ([a b]) (> b a))
+(defun count-increases [ns]
+  (count (filter (fun [[a b]] (> b a))
                  (zip ns (skip 1 ns)))))

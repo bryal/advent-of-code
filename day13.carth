@@ -2,44 +2,44 @@
 
 (data Instruction (FoldX Nat) (FoldY Nat))
 
-(define main
-  (do io/bind
-      (<- input (io/map unwrap! (read-file "inputs/day13.txt")))
-      (let (([dots0 instrs] (map-two list/iter list/iter (parse! manual-parser input)))
-            ([instr instrs] (next! instrs))
-            (dots1 (set/iter (fold-paper dots0 instr)))))
-      (display (str-append "Part 1: " (show-nat (count dots1))))
-      (display (str-append "Part 2:\n" (draw-paper (foldl (<oo set/iter fold-paper) dots1 instrs))))))
+(def main
+     (do io/bind
+         (<- input (io/map unwrap! (read-file "inputs/day13.txt")))
+         (let (([dots0 instrs] (map-two list/iter list/iter (parse! manual-parser input)))
+               ([instr instrs] (next! instrs))
+               (dots1 (set/iter (fold-paper dots0 instr)))))
+         (display (str-append "Part 1: " (show-nat (count dots1))))
+         (display (str-append "Part 2:\n" (draw-paper (foldl (<oo set/iter fold-paper) dots1 instrs))))))
 
-(define (fold-paper dots instr)
+(defun fold-paper [dots instr]
   (let (([n map-dim] (match instr (case (FoldX x) [x map-car]) (case (FoldY y) [y map-cadr])))
-        ((mirror-relevant dot) (map-dim (fun (m) (if (> m n) (- (* (to-nat 2) n) m) m)) dot)))
+        (mirror-relevant (fun [dot] (map-dim (fun [m] (if (> m n) (- (* (to-nat 2) n) m) m)) dot))))
     (set/collect cmp-pt (map mirror-relevant dots))))
 
-(define (draw-paper dots)
+(defun draw-paper [dots]
   (let ((set (set/collect cmp-pt dots))
         ([w h] (map-both (apps <o inc maximum list/iter) (unzip dots))))
-    (string/concat (flat-map (fun (y)
-                               (iter/chain (map (fun (x)
+    (string/concat (flat-map (fun [y]
+                               (iter/chain (map (fun [x]
                                                   (if (set/member? cmp-pt [x y] set) "█" "░"))
                                                 (xrange (to-nat 0) w))
                                            (iter/once "\n")))
                              (xrange (to-nat 0) h)))))
 
-(define manual-parser
-  (do parse/bind
-      (<- dots ((<oo parse/many (parse/lift2 cons'))
-                (parse/thenl parse/nat (parse/string ","))
-                (parse/thenl parse/nat (parse/string "\n"))))
-      parse/space
-      (<- instrs (parse/many
-                  (do parse/bind
-                      (parse/string "fold along ")
-                      (<- dim (parse/take-bytes (to-nat 1)))
-                      (parse/string "=")
-                      (<- n parse/nat)
-                      parse/space
-                      (parse/pure (match dim (case "x" (FoldX n)) (case _ (FoldY n)))))))
-      (parse/pure [dots instrs])))
+(def manual-parser
+     (do parse/bind
+         (<- dots (\(parse/many (parse/lift2 cons' #0 #1))
+                   (parse/thenl parse/nat (parse/string ","))
+                   (parse/thenl parse/nat (parse/string "\n"))))
+         parse/space
+         (<- instrs (parse/many
+                     (do parse/bind
+                         (parse/string "fold along ")
+                         (<- dim (parse/take-bytes (to-nat 1)))
+                         (parse/string "=")
+                         (<- n parse/nat)
+                         parse/space
+                         (parse/pure (match dim (case "x" (FoldX n)) (case _ (FoldY n)))))))
+         (parse/pure [dots instrs])))
 
-(define (cmp-pt [i1 j1] [i2 j2]) (match (num/cmp i1 i2) (case Eq (num/cmp j1 j2)) (case x x)))
+(defun cmp-pt [[i1 j1] [i2 j2]] (match (num/cmp i1 i2) (case Eq (num/cmp j1 j2)) (case x x)))

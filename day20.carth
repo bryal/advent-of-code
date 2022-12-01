@@ -1,44 +1,46 @@
 (import std)
 
-(define main
-  (do io/bind
-      (<- input (io/map unwrap! (read-file "inputs/day20.txt")))
-      (let1 [enhancement-algo-s ls] (next! (lines input)))
-      (let1 algo (array/map light? (string/as-array enhancement-algo-s)))
-      (let1 ls (skip 1 ls))
-      (let1 pixels0 ((set/collect cmp-pt)
-                     (flat-map (fun ([y l])
-                                 (filter-map (fun ([x c])
-                                               (if (light? c)
-                                                   (Some [(to-int y) (to-int x)])
-                                                 None))
-                                             (enumerate (string/bytes l))))
-                               (enumerate ls))))
-      (display (str-append "Part 1: " (show-nat (set/size (multi-enhance 2 algo [pixels0 False])))))
-      (display (str-append "Part 2: " (show-nat (set/size (multi-enhance 50 algo [pixels0 False])))))))
+(def main
+     (do io/bind
+         (<- input (io/map unwrap! (read-file "inputs/day20.txt")))
+         (let1 [enhancement-algo-s ls] (next! (lines input)))
+         (let1 algo (array/map light? (string/as-array enhancement-algo-s)))
+         (let1 ls (skip 1 ls))
+         (let1 pixels0 (set/collect
+                        cmp-pt
+                        (flat-map (fun [[y l]]
+                                    (filter-map (fun [[x c]]
+                                                  (if (light? c)
+                                                      (Some [(to-int y) (to-int x)])
+                                                    None))
+                                                (enumerate (string/bytes l))))
+                                  (enumerate ls))))
+         (display (str-append "Part 1: " (show-nat (set/size (multi-enhance 2 algo [pixels0 False])))))
+         (display (str-append "Part 2: " (show-nat (set/size (multi-enhance 50 algo [pixels0 False])))))))
 
-(define (multi-enhance n algo in)
+(defun multi-enhance [n algo in]
   (if (= n 0)
       (car in)
     (multi-enhance (dec n) algo (enhance algo in))))
 
-(define (enhance algo [in-pixels inverted?])
+(defun enhance [algo [in-pixels inverted?]]
   (let (([ymin xmin ymax xmax] (bounds in-pixels))
 
-        ((in-bounds? [y x]) (and (and (<= ymin y) (<= y ymax))
-                                 (and (<= xmin x) (<= x xmax))))
+        (in-bounds? (fun [[y x]] (and (and (<= ymin y) (<= y ymax))
+                                      (and (<= xmin x) (<= x xmax)))))
 
-        ((out-pixel-light? [y x])
-         (let1 alg-i (foldl (fun (n [i px])
-                              (set-bit (- (to-nat 8) i)
-                                       (if (in-bounds? px)
-                                           (set/member? cmp-pt px in-pixels)
-                                         inverted?)
-                                       n))
-                            (to-nat 0)
-                            (enumerate (iter/cartesian (range (dec y) (inc y))
-                                                       (range (dec x) (inc x)))))
-           (array/lookup! alg-i algo)))
+        (out-pixel-light?
+         (fun [[y x]]
+           (let1 alg-i (foldl (fun [n [i px]]
+                                (set-bit (- (to-nat 8) i)
+                                         (if (in-bounds? px)
+                                             (set/member? cmp-pt px in-pixels)
+                                           inverted?)
+                                         n))
+                              (to-nat 0)
+                              (enumerate (iter/cartesian (range (dec y) (inc y))
+                                                         (range (dec x) (inc x)))))
+             (array/lookup! alg-i algo))))
 
         (inverted?' (if (array/first! algo) (not inverted?) False)))
     [(set/collect cmp-pt (filter out-pixel-light?
@@ -46,13 +48,13 @@
                                                  (range (- xmin 1) (+ xmax 1)))))
      inverted?']))
 
-(define (bounds light-pixels)
+(defun bounds [light-pixels]
   (let1 [[y0 x0] rest] (next! (set/iter light-pixels))
-    (foldl (fun ([ymin xmin ymax xmax] [y x])
+    (foldl (fun [[ymin xmin ymax xmax] [y x]]
              [(min ymin y) (min xmin x) (max ymax y) (max xmax x)])
            [y0 x0 y0 x0]
            rest)))
 
-(define (cmp-pt [i1 j1] [i2 j2]) (match (num/cmp i1 i2) (case Eq (num/cmp j1 j2)) (case x x)))
+(defun cmp-pt [[i1 j1] [i2 j2]] (match (num/cmp i1 i2) (case Eq (num/cmp j1 j2)) (case x x)))
 
-(define (light? c) (str-eq (string/singleton-byte c) "#"))
+(defun light? [c] (str= (string/singleton-byte c) "#"))

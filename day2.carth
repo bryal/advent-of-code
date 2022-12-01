@@ -1,19 +1,19 @@
 (import std)
 
-(define main
-  (do io/bind
-      (<- inp (io/map unwrap! (read-file "inputs/day2.txt")))
-      (let1 cmds (map parse-cmd (lines inp)))
-      (display "Part 1:")
-      (display (show-int (let1 [x y] (exec1 cmds)
-                           (* x y))))
-      (display "Part 2:")
-      (display (show-int (let1 [x y _aim] (exec2 cmds)
-                           (* x y))))))
+(def main
+     (do io/bind
+         (<- inp (io/map unwrap! (read-file "inputs/day2.txt")))
+         (let1 cmds (map parse-cmd (lines inp)))
+         (display "Part 1:")
+         (display (show-int (let1 [x y] (exec1 cmds)
+                              (* x y))))
+         (display "Part 2:")
+         (display (show-int (let1 [x y _aim] (exec2 cmds)
+                              (* x y))))))
 
 (data Cmd (Forward Int) (Down Int))
 
-(define (parse-cmd line)
+(defun parse-cmd [line]
   (let ((ss (words line))
         ([s1 ss] (unwrap! (next ss)))
         ([s2 _]  (unwrap! (next ss)))
@@ -24,14 +24,16 @@
       (case "up" (Down (neg val)))
       (case _ (panic "unreachable")))))
 
-(define (exec1 cmds)
-  (define (go [x y])
-    (fmatch (case (Forward dx) [(+ dx x) y])
-            (case (Down dy) [x (+ dy y)])))
+(defun exec1 [cmds]
+  (defun go [[x y] move]
+    (match move
+      (case (Forward dx) [(+ dx x) y])
+      (case (Down dy) [x (+ dy y)])))
   (foldl go [0 0] cmds))
 
-(define (exec2 cmds)
-  (define (go [x y aim])
-    (fmatch (case (Forward dx) [(+ dx x) (+ (* dx aim) y) aim])
-            (case (Down daim)  [x        y                (+ daim aim)])))
+(defun exec2 [cmds]
+  (defun go [[x y aim] move]
+    (match move
+      (case (Forward dx) [(+ dx x) (+ (* dx aim) y) aim])
+      (case (Down daim)  [x        y                (+ daim aim)])))
   (foldl go [0 0 0] cmds))

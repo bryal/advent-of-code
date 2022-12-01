@@ -1,25 +1,25 @@
 (import std)
 
-(define test-input [4 8])
-(define real-input [5 6])
+(def test-input [4 8])
+(def real-input [5 6])
 
-(define main
-  (do io/bind
-      (display (str-append "Part 1: " (show-int (part1 real-input))))
-      (display (str-append "Part 2: " (show-int (part2 real-input))))))
+(def main
+     (do io/bind
+         (display (str-append "Part 1: " (show-int (part1 real-input))))
+         (display (str-append "Part 2: " (show-int (part2 real-input))))))
 
-(define (part1 [p1 p2])
-  (define (play die a b)
+(defun part1 [[p1 p2]]
+  (defun play [die a b]
     (let (([steps die] (roll3 die))
           (a (move steps a)))
       (if (>= (player-score a) 1000)
           (* (player-score b) (times-rolled die))
         (play die b a))))
-  (define (roll3 [st f n])
+  (defun roll3 [[st f n]]
     (let (([a st] (f st))  ([b st] (f st))  ([c st] (f st)))  [(+s a b c) [st f (+ n 3)]]))
-  (define (times-rolled [_ _ n]) n)
+  (defun times-rolled [[_ _ n]] n)
 
-  (let1 deterministic-die [1 (fun (i) [i (inc i)]) 0]
+  (let1 deterministic-die [1 (fun [i] [i (inc i)]) 0]
     (play deterministic-die [p1 0] [p2 0])))
 
 ;; 1XX      :: 3, 4, 5, 4, 5, 6, 5, 6, 7
@@ -33,32 +33,32 @@
 ;; 7 | 6
 ;; 8 | 3
 ;; 9 | 1
-(define (part2 [p1 p2])
-  (define dice-sum-freqs (array/collect-list (list [3 1] [4 3] [5 6] [6 7] [7 6] [8 3] [9 1])))
-  (define (play* victories games)
+(defun part2 [[p1 p2]]
+  (def dice-sum-freqs (array/collect-list (list [3 1] [4 3] [5 6] [6 7] [7 6] [8 3] [9 1])))
+  (defun play* [victories games]
     (match (map/remove-min games)
-      (case None (uncurry max victories))
+      (case None (apply2 max victories))
       (case (Some [[game n] games])
             (let1 [next-rounds add-victories] (partition-eithers (play n game))
               (play* (foldl |> victories (list/iter add-victories))
                      (map/extend-with cmp-game +
                                       games
                                       (list/iter next-rounds)))))))
-  (define (cmp-game [[apos1 ascore1] [apos2 ascore2]] [[bpos1 bscore1] [bpos2 bscore2]])
+  (defun cmp-game [[[apos1 ascore1] [apos2 ascore2]] [[bpos1 bscore1] [bpos2 bscore2]]]
     (cmp-four num/cmp num/cmp num/cmp num/cmp [ascore1 ascore2 apos1 apos2] [bscore1 bscore2 bpos1 bpos2]))
-  (define (play n [p1 p2])
-    (flat-map (fun ([steps1 m1])
+  (defun play [n [p1 p2]]
+    (flat-map (fun [[steps1 m1]]
                 (let1 p1 (move steps1 p1)
                   (if (>= (player-score p1) 21)
-                      (iter/once (Right (map-car (+ (* n m1)))))
-                    (map (fun ([steps2 m2])
+                      (iter/once (Right \(map-car \(+ (* n m1) #) #)))
+                    (map (fun [[steps2 m2]]
                            (let1 p2 (move steps2 p2)
                              (if (>= (player-score p2) 21)
-                                 (Right (map-cadr (+ (*s n m1 m2))))
+                                 (Right \(map-cadr \(+ (*s n m1 m2) #) #))
                                (Left [[p1 p2] (*s n m1 m2)]))))
                          (array/iter dice-sum-freqs)))))
               (array/iter dice-sum-freqs)))
   (play* [0 0] (map/singleton [[p1 0] [p2 0]] 1)))
 
-(define (move steps [pos score]) (let1 pos (inc (rem (dec (+ pos steps)) 10)) [pos (+ score pos)]))
-(define (player-score [_ sc]) sc)
+(defun move [steps [pos score]] (let1 pos (inc (rem (dec (+ pos steps)) 10)) [pos (+ score pos)]))
+(defun player-score [[_ sc]] sc)

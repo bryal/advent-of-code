@@ -1,35 +1,35 @@
 (import std)
 
-(define main
-  (do io/bind
-      (<- input (io/map unwrap! (read-file "inputs/day11.txt")))
-      (let ((flat-array (array/collect (map (<o to-int (flip - ascii-0))
-                                            (flat-map string/bytes (lines input)))))
-            (grid (array/collect (array/chunks (to-nat 10) flat-array)))))
-      (display (str-append "Part 1: " (show-int (part1 grid))))
-      (display (str-append "Part 2: " (show-int (part2 1 grid))))))
+(def main
+     (do io/bind
+         (<- input (io/map unwrap! (read-file "inputs/day11.txt")))
+         (let ((flat-array (array/collect (map (<o to-int (fun [c] (- c ascii-0)))
+                                               (flat-map string/bytes (lines input)))))
+               (grid (array/collect (array/chunks (to-nat 10) flat-array)))))
+         (display (str-append "Part 1: " (show-int (part1 grid))))
+         (display (str-append "Part 2: " (show-int (part2 1 grid))))))
 
-(define (part1 grid)
-  (car (foldl (fun ([n grid] _) (map-car (+ n) (step grid))) [0 grid] (xrange 0 100))))
+(defun part1 [grid]
+  (car (foldl (fun [[n grid] _] (map-car (partial-2 + n) (step grid))) [0 grid] (xrange 0 100))))
 
-(define (part2 n-steps grid)
+(defun part2 [n-steps grid]
   (let1 [n grid] (step grid) (if (= n 100) n-steps (part2 (inc n-steps) grid))))
 
-(define (step grid)
-  (define (filter-flashing grid ixs) (filter (<o (= 10) (flip array/lookup2d! grid)) ixs))
-  (define (flash-octopuses n grid)
-    (fmatch
-      (case None [n (array/map (array/map (fun (x) (if (> x 9) 0 x))) grid)])
+(defun step [grid]
+  (defun filter-flashing [grid ixs] (filter (fun [ix] (= 10 (array/lookup2d! ix grid))) ixs))
+  (defun flash-octopuses [n grid flashing]
+    (match flashing
+      (case None [n (array/map (partial-2 array/map (fun [x] (if (> x 9) 0 x))) grid)])
       (case (Some [ix rest])
             (let ((as (adjecents (map-both to-int ix)))
-                  (grid (foldl (fun (grid a) (array/modify2d! inc a grid)) grid as)))
+                  (grid (foldl (fun [grid a] (array/modify2d! inc a grid)) grid as)))
               (flash-octopuses (+ n 1) grid (next (iter/chain rest (filter-flashing grid as))))))))
-  (let ((grid (array/map (array/map inc) grid))
+  (let ((grid (array/map (partial-2 array/map inc) grid))
         (flashing (filter-flashing grid (iter/cartesian (range (to-nat 0) (to-nat 9))
                                                         (range (to-nat 0) (to-nat 9)))))
         ([n grid] (flash-octopuses 0 grid (next flashing))))
     [n grid]))
 
-(define (adjecents [i j])
+(defun adjecents [[i j]]
   (iter/cartesian (range (to-nat (max 0 (- i 1))) (to-nat (min 9 (+ i 1))))
                   (range (to-nat (max 0 (- j 1))) (to-nat (min 9 (+ j 1))))))

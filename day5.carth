@@ -1,45 +1,46 @@
 (import std)
 
-(define main
-  (do io/bind
-      (<- input (io/map unwrap! (read-file "inputs/day5.txt")))
-      (let (([ortho-points diag-points]
-             (map-both array/collect-list
-                       (partition-eithers (flat-map (<o line-points parse-line) (lines input)))))
-            (ortho-sorted (merge-sort point-cmp ortho-points))
-            (all-sorted (merge-sort point-cmp (array/append ortho-sorted diag-points)))))
-      (display (str-append "Part 1: " (show-int (count-intersections ortho-sorted))))
-      (display (str-append "Part 2: " (show-int (count-intersections all-sorted))))))
+(def main
+     (do io/bind
+         (<- input (io/map unwrap! (read-file "inputs/day5.txt")))
+         (let (([ortho-points diag-points]
+                (map-both array/collect-list
+                          (partition-eithers (flat-map (<o line-points parse-line) (lines input)))))
+               (ortho-sorted (merge-sort point-cmp ortho-points))
+               (all-sorted (merge-sort point-cmp (array/append ortho-sorted diag-points)))))
+         (display (str-append "Part 1: " (show-int (count-intersections ortho-sorted))))
+         (display (str-append "Part 2: " (show-int (count-intersections all-sorted))))))
 
 ;; The boxing of the accumulation is a hack to work around a bug in the codegen. `foldl` should
 ;; always be tail call optimized, but apparently it is not when the type of the accumulation is too
 ;; big or complex or something like that. No TCO => stack overflow / segfault for long
 ;; iterators. Boxing reduces the type to a simple pointer, which does not break TCO.
-(define (count-intersections ps)
-  (define (point-eq p1 p2) (match (point-cmp p1 p2) (case Eq True) (case _ False)))
+(defun count-intersections [ps]
+  (defun point-eq [p1 p2] (match (point-cmp p1 p2) (case Eq True) (case _ False)))
   (let (([p0 ps] (next! (array/iter ps)))
         ([p1 ps] (next! ps))
         (init (if (point-eq p0 p1) 1 0)))
-    (car (deref (foldl (fun ((Box [n p0 p1]) p2)
+    (car (deref (foldl (fun [(Box [n p0 p1]) p2]
                          ;; Don't count more than one intersection when more than one duplicate
                          (box [(if (and (point-eq p2 p1) (not (point-eq p2 p0))) (+ n 1) n) p1 p2]))
                        (box [init p0 p1])
                        ps)))))
 
-(define parse-line
+(defun parse-line [s]
   (parse! (do parse/bind
               (<- x1 parse/nat) (parse/string ",") (<- y1 parse/nat)
               (parse/string " -> ")
               (<- x2 parse/nat) (parse/string ",") (<- y2 parse/nat)
-              (parse/pure [[(to-int x1) (to-int y1)] [(to-int x2) (to-int y2)]]))))
+              (parse/pure [[(to-int x1) (to-int y1)] [(to-int x2) (to-int y2)]]))
+          s))
 
-(define (line-points [[x1 y1] [x2 y2]])
+(defun line-points [[[x1 y1] [x2 y2]]]
   (if (= x1 x2)
       (map Left (zip (repeat x1) (range (min y1 y2) (max y1 y2))))
     (if (= y1 y2)
         (map Left (zip (range (min x1 x2) (max x1 x2)) (repeat y1)))
       (let ((mag (abs (- x2 x1))) (dx (sign (- x2 x1))) (dy (sign (- y2 y1))))
-        (map (fun (i) (Right [(+ x1 (* dx i)) (+ y1 (* dy i))])) (range 0 mag))))))
+        (map (fun [i] (Right [(+ x1 (* dx i)) (+ y1 (* dy i))])) (range 0 mag))))))
 
-(define (point-cmp [x1 y1] [x2 y2])
+(defun point-cmp [[x1 y1] [x2 y2]]
   (match (num/cmp x1 x2) (case Lt Lt) (case Gt Gt) (case Eq (num/cmp y1 y2))))

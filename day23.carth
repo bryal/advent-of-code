@@ -48,30 +48,30 @@
 (data Amphipod Amber Bronze Copper Desert)
 (data Tile Corridor (Top Amphipod) (Bottom Amphipod))
 
-(define main
-  (do io/bind
-      (<- input (io/map unwrap! (read-file "inputs/day23.txt")))
-      (let1 xs (list/map (apps <o string/singleton-byte (flip string/nth-byte! input) to-nat)
-                         (list 31 33 35 37
-                               45 47 49 51)))
+(def main
+     (do io/bind
+         (<- input (io/map unwrap! (read-file "inputs/day23.txt")))
+         (let1 xs (list/map (apps <o string/singleton-byte (flip string/nth-byte! input) to-nat)
+                            (list 31 33 35 37
+                                  45 47 49 51)))
 
-      (let1 graph (array/collect-list
-                   (list [Corridor (list [1 1])]                        ; 0
-                         [Corridor (list [2 2] [7 2])]                  ; 1
-                         [Corridor (list [1 2] [3 2] [7 2] [9 2])]      ; 2
-                         [Corridor (list [2 2] [4 2] [9 2] [0xB 2])]    ; 3
-                         [Corridor (list [3 2] [5 2] [0xB 2] [0xD 2])]  ; 4
-                         [Corridor (list [4 2] [6 1] [0xD 2])]          ; 5
-                         [Corridor (list [5 1])]                        ; 6
-                         [(   Top Amber ) (list [1 2] [2 2] [8 1])]     ; 7
-                         [(Bottom Amber ) (list [7 1])]                 ; 8
-                         [(   Top Bronze) (list [2 2] [3 2] [0xA 1])]   ; 9
-                         [(Bottom Bronze) (list [9 1])]                 ; A
-                         [(   Top Copper) (list [3 2] [4 2] [0xC 1])]   ; B
-                         [(Bottom Copper) (list [0xB 1])]               ; C
-                         [(   Top Desert) (list [4 2] [5 2] [0xE 1])]   ; D
-                         [(Bottom Desert) (list [0xD 1])])))            ; E
-      (display (list/show id xs))))
+         (let1 graph (array/collect-list
+                      (list [Corridor (list [1 1])]                        ; 0
+                            [Corridor (list [2 2] [7 2])]                  ; 1
+                            [Corridor (list [1 2] [3 2] [7 2] [9 2])]      ; 2
+                            [Corridor (list [2 2] [4 2] [9 2] [0xB 2])]    ; 3
+                            [Corridor (list [3 2] [5 2] [0xB 2] [0xD 2])]  ; 4
+                            [Corridor (list [4 2] [6 1] [0xD 2])]          ; 5
+                            [Corridor (list [5 1])]                        ; 6
+                            [(   Top Amber ) (list [1 2] [2 2] [8 1])]     ; 7
+                            [(Bottom Amber ) (list [7 1])]                 ; 8
+                            [(   Top Bronze) (list [2 2] [3 2] [0xA 1])]   ; 9
+                            [(Bottom Bronze) (list [9 1])]                 ; A
+                            [(   Top Copper) (list [3 2] [4 2] [0xC 1])]   ; B
+                            [(Bottom Copper) (list [0xB 1])]               ; C
+                            [(   Top Desert) (list [4 2] [5 2] [0xE 1])]   ; D
+                            [(Bottom Desert) (list [0xD 1])])))            ; E
+         (display (list/show id xs))))
 
 (define (_ _)
   ;; Assumes that `to` is not occupied, and that `from` was not the amphipod's final resting place.
