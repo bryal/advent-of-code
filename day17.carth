@@ -1,0 +1,32 @@
+(import std)
+
+(def main
+     (do io/bind
+         (<- input (io/map unwrap! (read-file "inputs/day17.txt")))
+         (let1 [tx1 tx2 ty1 ty2]
+             (parse! (do parse/bind
+                         (parse/string "target area: x=")
+                         (<- x1 parse/int) (parse/string "..") (<- x2 parse/int)
+                         (parse/string ", y=")
+                         (<- y1 parse/int) (parse/string "..") (<- y2 parse/int)
+                         (parse/pure [x1 x2 y1 y2]))
+                     input))
+         (display (str-append "Part 1: " (show-int (tri (dec (neg ty1))))))
+         (apps |> (iter/cartesian (range (to-int (sqrt (cast (* 2 tx1))))
+                                         tx2)
+                                  (range ty1
+                                         (dec (neg ty1))))
+               \(filter (fun [[px py]]
+                          (any (fun [[x y]] (and (<= tx1 x) (>= ty2 y)))
+                               (take-while (fun [[x y]] (and (<= x tx2) (>= y ty1)))
+                                           (map (fun [t] [(x-at-t px t) (y-at-t py t)])
+                                                (range-from 1)))))
+                        #)
+               count
+               show-nat
+               \(str-append "Part 2: " #)
+               display)))
+
+(defun x-at-t [px t] (let1 t (min px t) (/ (* t (- (* 2 px) (- t 1))) 2)))
+(defun y-at-t [py t] (/ (* t (- (* 2 py) (- t 1))) 2))
+(defun tri [a] (/ (* a (+ a 1)) 2))

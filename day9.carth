@@ -1,0 +1,45 @@
+(import std)
+
+(def main
+     (do io/bind
+         (<- input (io/map unwrap! (read-file "inputs/day9.txt")))
+         (let ((dim (string/length-bytes (iter/first! (lines input))))
+               (height-array (array/collect (map (fun [n] (- n ascii-0)) (flat-map string/bytes (lines input)))))
+               (heightmap (array/collect (array/chunks dim height-array)))
+               (low-points (filter-map (fun [pt]
+                                         (let ((h (array/lookup2d! pt heightmap))
+                                               (adjs (filter-map (fun [pt] (array/lookup2d pt heightmap))
+                                                                 (list/iter (adjecent-points pt)))))
+                                           (if (all (fun [adj] (< h adj)) adjs)  (Some pt)  None)))
+                                       (iter/cartesian (xrange (to-nat 0) (array/length heightmap))
+                                                       (xrange (to-nat 0) dim))))))
+         (display (str-append "Part 1: " (show-nat (part1 heightmap low-points))))
+         (display (str-append "Part 2: " (show-nat (part2 heightmap low-points))))))
+
+(defun part1 [heightmap low-points]
+  (sum (map (fun [pt] (inc (to-nat (array/lookup2d! pt heightmap)))) low-points)))
+
+(defun part2 [heightmap low-points]
+  (defun cmp-pt [[i1 j1] [i2 j2]] (match (num/cmp i1 i2) (case Eq (num/cmp j1 j2)) (case x x)))
+  (defun basin-size
+    (case [seen LNil] (set/size seen))
+    (case [seen (LCons (Box [pt pts]))]
+          (if (set/member? cmp-pt pt seen)
+              (basin-size seen pts)
+            (if (= 9 (maybe' 9 to-int (array/lookup2d pt heightmap)))
+                (basin-size seen pts)
+              (basin-size (set/insert cmp-pt pt seen)
+                          (list/append (adjecent-points pt) pts))))))
+  (apps |> low-points
+        (partial-2 map (fun [pt] (basin-size set/empty (list/singleton pt))))
+        array/collect
+        (partial-2 merge-sort num/cmp)
+        array/iter-rev
+        (partial-2 take 3)
+        product))
+
+(defun adjecent-points [[i j]]
+  (list [(dec i) j]
+        [i (inc j)]
+        [(inc i) j]
+        [i (dec j)]))

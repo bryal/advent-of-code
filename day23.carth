@@ -1,0 +1,97 @@
+;; Känns lite som ett schemaläggningsproblem?
+;;
+;; 1. Delar upp korridoren i segment, eller schemalägg för varje punkt kanske
+;; 2. Beräkna vilka segment/punkter som är del av vägen till målet
+;; 3. Optimera schemat
+;;
+;; Fast man kan ju ta andra vägar än den direkta. Att en A tar en omväg är ju att föredra, om en D
+;; kan ta en kortare väg. Hmm, kanske inte en bra idé ändå.
+
+
+;; Man kanske kan gö nåt med BFS / prioritetskö? Modellera alla alternativ i en tidpunkt, och väg
+;; med nuvarande priset. Prioritera att utveckla tillstånd där priset är lågt.
+;;
+;; Genererade moves från ett tillstånd är för varje gubbe som kan röra sig, alla kortaste steg den
+;; kan göra. Från starttillståndet tror jag det blir 4*2=8 moves.
+;;
+;; Utifrån ett tillstånd kan man generera flera dåliga moves, men de kommer hamna långt bak i kön
+;; och inte vidareutvecklas.
+;;
+;; Prioritetskö efter pris garanterar att vi hittar en optimal lösning.
+;;
+;; En annan indikation att detta är en av de "rätta" lösningarna är att vi har gjort några uppgifter
+;; med BFS och en med Dijkstra/prioritetskö innan i år.
+
+;; Number the tiles like this, and keep them as a graph in an array. Exclude the "porch" tiles, and
+;; add instead a "length" attribute to edges, with those going via the porch being length 2. Numbers
+;; are in hex for visualization purposes.
+;;
+;; #############
+;; #01 2 3 4 56#
+;; ###7#9#B#D###
+;;   #8#A#C#E#
+;;   #########
+;;
+;; We'll need to store the full state of the amphipods's positions for each element in the priority
+;; queue, so we should keep it compact. It's really just a [0,14] = [0,E] => 4-bit index for each of
+;; the 8 amphipods. 8 * 4 bits = 32 bits. Great! Fits in a single Nat32! Then we have a single,
+;; shared, constant graph just to help us compute the possible moves etc.
+;;
+;; Since we only have tiles [0,E], the value F is unused. We could use this to represent that an
+;; amphipod has reached it's final resting place. Either at the bottom of its home, or at the top
+;; AND the space below is occupied by (an amphipod of the same kind) <=> (an amphipod that has also
+;; reached its final resting place). This also makes for a simple stop-condition -- when all
+;; amphipods have reached their final resting places (<=> when the Nat32 is equal to (cast -1)).
+
+(import std)
+
+(data Amphipod Amber Bronze Copper Desert)
+(data Tile Corridor (Top Amphipod) (Bottom Amphipod))
+
+(def main
+     (do io/bind
+         (<- input (io/map unwrap! (read-file "inputs/day23.txt")))
+         (let1 xs (list/map (apps <o string/singleton-byte (flip string/nth-byte! input) to-nat)
+                            (list 31 33 35 37
+                                  45 47 49 51)))
+
+         (let1 graph (array/collect-list
+                      (list [Corridor (list [1 1])]                        ; 0
+                            [Corridor (list [2 2] [7 2])]                  ; 1
+                            [Corridor (list [1 2] [3 2] [7 2] [9 2])]      ; 2
+                            [Corridor (list [2 2] [4 2] [9 2] [0xB 2])]    ; 3
+                            [Corridor (list [3 2] [5 2] [0xB 2] [0xD 2])]  ; 4
+                            [Corridor (list [4 2] [6 1] [0xD 2])]          ; 5
+                            [Corridor (list [5 1])]                        ; 6
+                            [(   Top Amber ) (list [1 2] [2 2] [8 1])]     ; 7
+                            [(Bottom Amber ) (list [7 1])]                 ; 8
+                            [(   Top Bronze) (list [2 2] [3 2] [0xA 1])]   ; 9
+                            [(Bottom Bronze) (list [9 1])]                 ; A
+                            [(   Top Copper) (list [3 2] [4 2] [0xC 1])]   ; B
+                            [(Bottom Copper) (list [0xB 1])]               ; C
+                            [(   Top Desert) (list [4 2] [5 2] [0xE 1])]   ; D
+                            [(Bottom Desert) (list [0xD 1])])))            ; E
+         (display (list/show id xs))))
+
+(define (_ _)
+  ;; Assumes that `to` is not occupied, and that `from` was not the amphipod's final resting place.
+  (define: (valid-move? amphipod ifrom ito) (Fun Amphipod Tile Tile Bool)
+    (let ((from (_ ifrom))
+          (to (_ ito)))
+      (match from
+        ;; If we're at the bottom and its not the final resting place, we're in the wrong house.
+        (case (Bottom owner) True)
+        (case (Top owner)
+              (match to
+                (case (Bottom _) (amphipod/= amphipod owner))
+                ()
+                ))
+        (case () (match to
+                   (case (Top owner) (andalso (amphipod/= amphipod owner)
+                                              ;; Inc by one moves from Top to Bottom
+                                              (maybe' True amphipod/= (occupant (inc ito)))))
+                   (case () ())))))))
+
+(define amphipod/!= (<oo not amphipod/=))
+(define: (amphipod/= a b) (Fun Amphipod Amphipod Bool)
+  (= (: (transmute a) Nat8) (transmute b)))

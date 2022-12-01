@@ -1,0 +1,123 @@
+(import std)
+
+(data Vec3 (Vec3 Int Int Int))
+(data Transform (Transform Vec3 Int)) ; translation & rotation index
+(data Scanner (Scanner Nat (List Vec3)))
+
+(def main
+     (do io/bind
+         (<- input (io/map unwrap! (read-file "inputs/day19.txt")))
+         (let ((scanners (parse-scanners input))
+               (transforms (scanner-transforms (first! scanners) (rest! scanners)))
+               (scanners' (transform-scanners scanners transforms))))
+         (display (str-append "Part 1: " (show-nat (count-beacons scanners'))))
+         (let ((origin0 (Vec3 0 0 0))
+               (origins (list/cons origin0 (list/collect (map \(apply-transforms # origin0)
+                                                              (map/vals transforms)))))
+               (dist (maximum (map manhattan (iter/cartesian (list/iter origins) (list/iter origins)))))))
+         (display (str-append "Part 2: " (show-int dist)))))
+
+(defun manhattan [[v1 v2]]
+  (let1 (Vec3 dx dy dz) (vec3/- v1 v2)
+    (+s (abs dx) (abs dy) (abs dz))))
+
+(defun count-beacons [scanners] :of (Fun [(List Scanner)] Nat)
+  (set/size (set/collect vec3/cmp (flat-map (<o list/iter scanner-beacons) (list/iter scanners)))))
+
+(defun transform-scanners [scanners transforms] :of (Fun [(List Scanner) (Map Nat (List Transform))] (List Scanner))
+  (list/map (fun [(Scanner n bs)]
+              (Scanner n (if (= n (to-nat 0))
+                             bs
+                           (let1 tr (map/lookup! num/cmp n transforms)
+                             (list/map \(apply-transforms tr #) bs)))))
+            scanners))
+
+(defun scanner-transforms [scanner0 scanners] :of (Fun [Scanner (List Scanner)] (Map Nat (List Transform)))
+  (def n-tot (list/count scanners))
+  (defun reduce [trs]
+    (defun reduce' [[m tr]]
+      (if (= m (to-nat 0))
+          (list/singleton tr)
+        (list/cons tr (reduce' (map/lookup! num/cmp m trs)))))
+    (map/collect num/cmp (map \(map-cadr reduce' #) (map/iter trs))))
+  (defun go [trs targets]
+    (if (>= (map/size trs) n-tot)
+        (reduce trs)
+      (let (([target targets] (unwrap! (list/uncons targets)))
+            (remaining (filter \(not (map/member? num/cmp (scanner-id #) trs))
+                               (list/iter scanners)))
+            (ovs (find-overlapping (trace-show \(array/show show-nat (array/collect (map scanner-id #))) remaining) target))
+            (ovs-trs (map (fun [[ov tr]] [(scanner-id ov) [(scanner-id target) tr]]) (list/iter ovs))))
+        (go (map/extend num/cmp trs ovs-trs) (list/append (list/map car ovs) targets)))))
+  (go map/empty (list/singleton scanner0)))
+
+(defun find-overlapping [scanners target] :of (Fun [(Iter Scanner) Scanner] (List [Scanner Transform]))
+  (list/collect
+   (filter-map (fun [scanner] (maybe/map \(trace-show (fun [[sc tr]] (apps str-append (show-nat (scanner-id sc)) " -> " (show-nat (scanner-id target))))
+                                                      (cons' scanner #))
+                                         (overlaps? scanner target))) scanners)))
+
+(defun overlaps? [(Scanner _ bs1) (Scanner _ bs2)] :of (Fun [Scanner Scanner] (Maybe Transform))
+  (let1 bs2' (set/collect vec3/cmp (list/iter bs2))
+    (iter/first
+     (flat-map (fun [rot]
+                 (let ((bs1' (list/map \(apply-rot rot #) bs1))
+                       (translations (apps |> (iter/cartesian (list/iter bs2) (list/iter bs1'))
+                                           \(map \(apply2 vec3/- #) #)
+                                           \(set/collect vec3/cmp #)
+                                           set/iter)))
+                   (filter-map (fun [dv]
+                                 (let1 bs1'' (set/collect vec3/cmp (map \(vec3/+ dv #) (list/iter bs1')))
+                                   (if (>= (set/size (set/isect vec3/cmp bs1'' bs2')) (to-nat 12))
+                                       (Some (Transform dv rot))
+                                     None)))
+                               translations)))
+               (range 0 23)))))
+
+(defun scanner-id [(Scanner n _)] n)
+(defun scanner-beacons [(Scanner _ bs)] bs)
+
+(defun vec3/cmp [(Vec3 x1 y1 z1) (Vec3 x2 y2 z2)]
+  (match (num/cmp x1 x2)
+    (case Eq (match (num/cmp y1 y2)
+               (case Eq (num/cmp z1 z2))
+               (case x x)))
+    (case x x)))
+
+(defun vec3/+ [(Vec3 x1 y1 z1) (Vec3 x2 y2 z2)] (Vec3 (+ x1 x2) (+ y1 y2) (+ z1 z2)))
+(defun vec3/- [(Vec3 x1 y1 z1) (Vec3 x2 y2 z2)] (Vec3 (- x1 x2) (- y1 y2) (- z1 z2)))
+
+(defun apply-transforms [trs v] (foldl apply-transform v (list/iter trs)))
+(defun apply-transform [v (Transform transl rot)] :of (Fun [Vec3 Transform] Vec3)
+  (vec3/+ transl (apply-rot rot v)))
+
+(defun apply-rot [rot v] (direction (rem rot 6) (roll (/ rot 6) v)))
+
+(defun roll [i (Vec3 x y z)]
+  (match (rem i 4)
+    (case 0 (Vec3      x       y  z))
+    (case 1 (Vec3 (neg y)      x  z))
+    (case 2 (Vec3 (neg x) (neg y) z))
+    (case _ (Vec3      y  (neg x) z))))
+
+(defun direction [i (Vec3 x y z)]
+  (match (rem i 6)
+    (case 0 (Vec3      x       y       z ))
+    (case 1 (Vec3 (neg z)      y       x ))
+    (case 2 (Vec3 (neg x)      y  (neg z)))
+    (case 3 (Vec3      z       y  (neg x)))
+    (case 4 (Vec3      x       z  (neg y)))
+    (case _ (Vec3      x  (neg z)      y ))))
+
+(defun parse-scanners [inp]
+  (def pvec
+       (do parse/bind
+           (<- x parse/int) (parse/string ",") (<- y parse/int) (parse/string ",") (<- z parse/int)
+           (parse/pure (Vec3 x y z))))
+  (def pscanner
+       (do parse/bind
+           (parse/take-bytes-while1 \(/= ascii-newline #))
+           parse/space1
+           (parse/sep-by1 parse/space1 pvec)))
+  (list/collect (map \(apply2 Scanner #)
+                     (enumerate (list/iter (parse! (parse/sep-by1 parse/space pscanner) inp))))))

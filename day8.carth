@@ -1,0 +1,58 @@
+(import std)
+
+(def main
+     (do io/bind
+         (<- input (io/map unwrap! (read-file "inputs/day8.txt")))
+         (let1 entries (map parse-line (lines input)))
+         (display (str-append "Part 1: " (show-nat (part1 entries))))
+         (display (str-append "Part 2: " (show-int (part2 entries))))))
+
+(defun part1 [entries]
+  (apps |> entries
+        (partial-2 flat-map (<o array/iter cadr))
+        (partial-2 filter (apps <o
+                                (fun [x] (list/elem? num/cmp x (list 2 3 4 7)))
+                                to-int
+                                string/length-bytes))
+        count))
+
+(defun part2 [entries]
+  (sum (map output-value entries)))
+
+(defun output-value [[in-patterns out-patterns]]
+  (let ((in-patterns (array/iter in-patterns))
+        (seg-set (fun [n] (apps |> in-patterns
+                                (partial-2 iter/find (<o (partial-2 = (to-nat n)) string/length-bytes))
+                                unwrap!
+                                string/bytes
+                                (partial-2 set/collect num/cmp))))
+        (s1 (seg-set 2))
+        (s4 (seg-set 4))
+        (decode (fun [pat]
+                  (let ((n (fun [x] (= (to-nat x) (string/length-bytes pat))))
+                        (s (set/collect num/cmp (string/bytes pat)))
+                        (isect-n (fun [m s'] (= (to-nat m) (set/size (set/isect num/cmp s s'))))))
+                    (cond ((and (n 6) (isect-n 1 (set/diff num/cmp s4 s1)))  0)
+                          (     (n 2)                                1)
+                          ((and (n 5) (isect-n 2 s4))                2)
+                          ((and (n 5) (isect-n 2 s1))                3)
+                          (     (n 4)                                4)
+                          (     (n 5)                                5)
+                          ((and (n 6) (isect-n 1 s1))                6)
+                          (     (n 3)                                7)
+                          (     (n 7)                                8)
+                          (else                                      9))))))
+    (apps |> out-patterns
+          array/iter-rev
+          enumerate
+          (partial-2 map (fun [[i p]] (* (decode p) (powi 10 i))))
+          sum)))
+
+(defun parse-line [s]
+  (def segs (parse/take-bytes-while (<o not whitespace-byte?)))
+  (parse! (do parse/bind
+              (<- as (parse/n-times (to-nat 10) (parse/thenl segs parse/space1)))
+              (parse/string "|")
+              (<- bs (parse/n-times (to-nat 4) (parse/thenr parse/space1 segs)))
+              (parse/pure [as bs]))
+          (trim s)))

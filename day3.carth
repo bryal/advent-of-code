@@ -1,0 +1,54 @@
+(import std)
+
+(def main
+     (do io/bind
+         (<- inp (io/map unwrap! (read-file "inputs/day3.txt")))
+         (let ((ls (lines inp))
+               (width (string/length-bytes (iter/first! ls)))
+               (mask (- (shift-l (cast 1) width) (cast 1)))
+               (nums (map parse-binary ls))))
+         (display (str-append "Width: " (show-nat width)))
+         (display (str-append "Mask: " (show-nat mask)))
+         (let1 [gamma epsilon power] (part1 width mask nums))
+         (display (apps str-append
+                        "Part 1: gamma = " (show-nat gamma)
+                        ", epsilon = " (show-nat epsilon)
+                        ", power = " (show-nat (* gamma epsilon))))
+         (let1 [o2 co2] (part2 (cast width) nums))
+         (display (apps str-append
+                        "Part 2: o2 = " (show-nat o2)
+                        ", co2 = " (show-nat co2)
+                        ", life = " (show-nat (* o2 co2))))))
+
+(defun part1 [width mask nums]
+  (let ((counts (foldl (fun [acc [num i]]
+                         (array/modify! \(+ # (- (* 2 (index-bit i num)) 1))
+                                        (cast i)
+                                        acc))
+                       (array/collect (take width (repeat 0)))
+                       (iter/cartesian nums (xrange 0 (cast width)))))
+        (gamma (foldl (fun [acc [i n]] (set-bit (cast i) (>= n 0) acc))
+                      (to-nat 0)
+                      (enumerate (array/iter counts))))
+        (epsilon (bit-and mask (bit-not gamma))))
+    [gamma epsilon (* gamma epsilon)]))
+
+(defun part2 [width nums]
+  (defun determine-rating [selector i nums]
+    (if (= 1 (to-int (array/length nums)))
+        (to-nat (array/lookup! (to-nat 0) nums))
+      (let ((nums (array/iter nums))
+            (balance (bit-balance i nums)))
+        (determine-rating
+         selector
+         (- i 1)
+         (array/collect (filter \(= (index-bit i #) (selector balance))
+                                nums))))))
+  [(determine-rating (fun [balance] (if (>= balance 0) 1 0))
+                     (- width 1) (array/collect nums))
+   (determine-rating (fun [balance] (if (>= balance 0) 0 1))
+                     (- width 1) (array/collect nums))])
+
+;; Negative => more zeroes, positive => more ones
+(defun bit-balance [col-i nums]
+  (sum (map \(- (* 2 (index-bit col-i #)) 1) nums)))

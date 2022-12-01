@@ -1,0 +1,56 @@
+(import std)
+
+(def main
+     (do io/bind
+         (<- input (io/map unwrap! (read-file "inputs/day10.txt")))
+         (let1 [corrupteds incompletes] (partition-eithers (map execute (lines input))))
+         (display (str-append "Part 1: "
+                              (apps |> corrupteds
+                                    list/iter
+                                    (partial-2 map corrupted-points)
+                                    sum
+                                    show-int)))
+         (display (str-append "Part 2: "
+                              (apps |> incompletes
+                                    list/iter
+                                    (partial-2 map incomplete-score)
+                                    array/collect
+                                    (partial-2 merge-sort num/cmp)
+                                    array/middle
+                                    unwrap!
+                                    show-int)))))
+
+(data Bracket Round Square Curly Angle)
+
+(defun corrupted-points
+  (case [Round] 3) (case [Square] 57) (case [Curly] 1197) (case [Angle] 25137))
+
+(defun incomplete-score [missings]
+  (foldl  (fun [tot b] (+ (* 5 tot) (inc (bracket-to-int b))))  0  (list/iter missings)))
+
+;;? Returns Left with last token when corrupted, and Right with the missing brackets when incomplete
+(defun execute [line]
+  (defun go [stack inp]
+    (defun open [bracket] (Right (list/cons bracket stack)))
+    (defun close [b2]
+      (match (list/uncons stack)
+        (case None (Left b2))
+        (case (Some [b1 stack']) (if (bracket-eq b1 b2) (Right stack') (Left b2)))))
+    (match inp
+      (case None (Right stack))
+      (case (Some [symbol rest])
+            (match (match symbol
+                     (case "(" (open Round))
+                     (case "[" (open Square))
+                     (case "{" (open Curly))
+                     (case "<" (open Angle))
+                     (case ")" (close Round))
+                     (case "]" (close Square))
+                     (case "}" (close Curly))
+                     (case _   (close Angle)))
+              (case (Left bracket) (Left bracket))
+              (case (Right stack') (go stack' (next rest)))))))
+  (go LNil (next (map string/singleton-byte (string/bytes line)))))
+
+(defun bracket-eq [b1 b2] (= (bracket-to-int b1) (bracket-to-int b2)))
+(defun bracket-to-int [b] (to-int (: (transmute b) Nat8)))

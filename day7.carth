@@ -1,0 +1,18 @@
+(import std)
+
+(def main
+     (do io/bind
+         (<- input (io/map unwrap! (read-file "inputs/day7.txt")))
+         (let1 crabs (apps |> input
+                           trim
+                           (partial-2 string/splits-on ",")
+                           (partial-2 map (<o unwrap! parse-int))
+                           array/collect
+                           (partial-2 merge-sort num/cmp)))
+         (display (apps str-append "Part 1: " (show-int (total-fuel id (median crabs) crabs))))
+         (display (apps str-append "Part 2: " (show-int (total-fuel sum-nats-to-n (mean crabs) crabs))))))
+
+(defun median [sorted] (array/lookup! (/ (array/length sorted) (to-nat 2)) sorted))
+(defun mean [xs] (/ (+ (sum (array/iter xs)) 1) (to-int (array/length xs))))
+(defun total-fuel [f align crabs] (sum (map (fun [crab] (f (abs (- align crab)))) (array/iter crabs))))
+(defun sum-nats-to-n [n] (/ (* n (+ 1 n)) 2)) ; Formula for sum of range [1,n]

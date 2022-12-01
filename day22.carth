@@ -1,0 +1,67 @@
+(import std)
+
+(data Vec3 (Vec3 Int Int Int))
+(data Cuboid (Cuboid Vec3 Vec3))
+
+(def main
+     (do io/bind
+         (<- input (io/map unwrap! (read-file "inputs/day22.txt")))
+         (let1 cmds (parse-commands input))
+         (let ((cmds' (filter-map (fun [[on? xs ys zs]]
+                                    (if (any \(< 50 (abs #))
+                                             (list/iter (list (car xs) (cadr xs)
+                                                              (car ys) (cadr ys)
+                                                              (car zs) (cadr zs))))
+                                        None
+                                      (Some [on? xs ys zs])))
+                                  cmds))))
+         (display (str-append "Part 1: " (show-int (count-cubes (execute [LNil LNil] cmds')))))
+         (display (str-append "Part 2: " (show-int (count-cubes (execute [LNil LNil] cmds)))))))
+
+(defun count-cubes [[additives subtractives]]
+  (- (sum (map cuboid/volume (list/iter additives)))
+     (sum (map cuboid/volume (list/iter subtractives)))))
+
+(def execute
+     \(foldl (fun [volumes [on? [x1 x2] [y1 y2] [z1 z2]]]
+               (let1 c (Cuboid (Vec3 x1 y1 z1) (Vec3 x2 y2 z2))
+                 (if on? (add c volumes) (subtract c volumes))))
+             #0
+             #1))
+
+(defun add [c [additives subtractives]]
+  [(list/append' (filter-map \(intersection c #) (list/iter subtractives)) (list/cons c additives))
+   (list/append' (filter-map \(intersection c #) (list/iter additives))    subtractives)])
+
+(defun subtract [c [additives subtractives]]
+  [(list/append' (filter-map \(intersection c #) (list/iter subtractives)) additives)
+   (list/append' (filter-map \(intersection c #) (list/iter additives))    subtractives)])
+
+(defun intersection [(Cuboid a1 a2) (Cuboid b1 b2)]
+  (let ((c1 (vec3/zip-with max a1 b1))
+        (c2 (vec3/zip-with min a2 b2))
+        ((Vec3 dx dy dz) (vec3/- c2 c1)))
+    (if (apps or (< dx 0) (< dy 0) (< dz 0))
+        None
+      (Some (Cuboid c1 c2)))))
+
+(defun cuboid/volume [(Cuboid p1 p2)]
+  (let1 (Vec3 dx dy dz) (vec3/+ (vec3/- p2 p1) (vec3/repeat 1)) (*s dx dy dz)))
+
+(defun vec3/- [v1 v2] (vec3/zip-with - v1 v2))
+(defun vec3/+ [v1 v2] (vec3/zip-with + v1 v2))
+(defun vec3/zip-with [f (Vec3 x1 y1 z1) (Vec3 x2 y2 z2)] (Vec3 (f x1 x2) (f y1 y2) (f z1 z2)))
+(defun vec3/repeat [x] (Vec3 x x x))
+
+(def parse-commands
+     (def prange
+          (parse/lift2 cons' parse/int (parse/thenr (parse/string "..") parse/int)))
+     (def pcmd
+          (do parse/bind
+              (<- on (parse/or (parse/thenr (parse/string "on")  (parse/pure True))
+                               (parse/thenr (parse/string "off") (parse/pure False))))
+              (parse/string " x=") (<- xs prange)
+              (parse/string ",y=") (<- ys prange)
+              (parse/string ",z=") (<- zs prange)
+              (parse/pure [on xs ys zs])))
+     \(map \(parse! pcmd #) (lines #)))

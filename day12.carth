@@ -1,0 +1,36 @@
+(import std)
+
+(def main
+     (do io/bind
+         (<- input (io/map unwrap! (read-file "inputs/day12.txt")))
+         (let ((edges-list (parse! edges-parser input))
+               (edges (apps |> edges-list
+                            list/iter
+                            \(flat-map (fun [[a b]] (iter/cons [a b] (iter/once [b a]))) #)
+                            \(filter \(not (str= "start" (cadr #))) #)
+                            \(map \(map-cadr array/singleton #) #)
+                            \(map/collect-with str-cmp array/append #)))))
+         (display (array/show \(show-two id \(array/show id #) #) (array/collect (map/iter edges))))
+         (display (str-append "Part 1: " (show-nat (count (paths-from edges False set/empty "start")))))
+         (display (str-append "Part 2: " (show-nat (count (paths-from edges True set/empty "start")))))))
+
+(defun paths-from [edges double-dip? seen from]
+  (defun continue [double-dip?]
+    (let1 seen (if (small? from) (set/insert str-cmp from seen) seen)
+      (apps |> (map/lookup! str-cmp from edges)
+            array/iter
+            \(flat-map \(paths-from edges double-dip? seen #) #)
+            \(map \(list/cons from #) #))))
+  (if (str= from "end")
+      (iter/once (list/singleton "end"))
+    (if (set/member? str-cmp from seen)
+        (if double-dip?
+            (continue False)
+          iter/nil)
+      (continue double-dip?))))
+
+(def edges-parser
+     (def pcave (parse/take-bytes-while1 alphabetic-byte?))
+     (parse/sep-by1 parse/space1 (parse/lift2 cons' pcave (parse/thenr (parse/string "-") pcave))))
+
+(defun small? [s] (lowercase-byte? (string/nth-byte! (to-nat 0) s)))

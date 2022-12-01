@@ -1,0 +1,55 @@
+(import std)
+
+(def main
+     (do io/bind
+         (<- input (io/map unwrap! (read-file "inputs/day14.txt")))
+         (let (([template ls] (next! (lines input)))
+               (rules (array/set-multiple! (array/unsafe-uninit (to-nat (* 26 26)))
+                                           (map parse-rule (skip 1 ls))))))
+         (display (str-append "Part 1: " (show-int (grow-polymer-from-template template rules 10))))
+         (display (str-append "Part 2: " (show-int (grow-polymer-from-template template rules 40))))))
+
+(defun grow-polymer-from-template [template rules nsteps]
+  (defun nonzero-pair-counts [pair-counts]
+    (filter \(> (cadr #) 0) (enumerate (array/iter pair-counts))))
+
+  (defun divide [[pair-ix n]]
+    (let (([l1 l2] (ix-to-pair pair-ix))
+          (r (array/lookup! pair-ix rules)))
+      (list/iter (list [(pair-to-ix [l1 r]) n] [(pair-to-ix [r l2]) n]))))
+
+  (defun go [nsteps pairs]
+    (let ((pair-counts (array/unsafe-uninit (to-nat (* 26 26))))
+          (pair-counts (array/modify-multiple! pair-counts (map \(map-cadr (fun [a] \(+ a #)) #) pairs))))
+      (if (= nsteps 0)
+          pair-counts
+        (go (dec nsteps) (flat-map divide (nonzero-pair-counts pair-counts))))))
+
+  (let ((template (array/map char-to-num (string/as-array template)))
+        (first-elem (to-nat (array/first! template)))
+        (last-elem (to-nat (array/last! template)))
+        (pair-counts (go nsteps (zip (map (<o pair-to-ix array/first-two!)
+                                          (array/windows (to-nat 2) template))
+                                     (repeat 1))))
+        (dup-single-counts
+         (flat-map (fun [[i n]]
+                     (apply2 iter/chain
+                             (map-both \(iter/once (cons' # n)) (ix-to-pair i))))
+                   (nonzero-pair-counts pair-counts)))
+        (single-counts (apps |> (array/unsafe-uninit (to-nat 26))
+                             \(array/modify-multiple! # (map \(map-cadr (fun [a] \(+ a #)) #) dup-single-counts))
+                             \(array/modify! inc first-elem #)
+                             \(array/modify! inc last-elem #)
+                             \(array/map \(/ # 2) #))))
+    (- (maximum (array/iter single-counts)) (minimum (filter \(> # 0) (array/iter single-counts))))))
+
+(defun parse-rule [s]
+  (let ((l1 (string/nth-byte! (to-nat 0) s))
+        (l2 (string/nth-byte! (to-nat 1) s))
+        (r  (string/nth-byte! (to-nat 6) s)))
+    [(pair-to-ix [(char-to-num l1) (char-to-num l2)])
+     (char-to-num r)]))
+
+(defun char-to-num [c] (- c ascii-A))
+(defun pair-to-ix [[n m]] (+ (* (to-nat 26) (to-nat n)) (to-nat m)))
+(defun ix-to-pair [i] [(/ i (to-nat 26)) (rem i (to-nat 26))])
