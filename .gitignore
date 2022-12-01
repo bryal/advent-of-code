@@ -2,3 +2,5 @@
 *.cabal
 *~
 *.lock
+/hello/
+/2021/*.c
