@@ -2,7 +2,7 @@
 
 module Main (main) where
 
-import Lib
+import Day16
 
 main :: IO ()
-main = foo
+main = print =<< part2
