@@ -7,6 +7,6 @@ perf.*
 *.out
 /hello/
 /2021/*.c
-/2021/*.o
-/2021/*.bin
+*.o
+*.bin
 target/
