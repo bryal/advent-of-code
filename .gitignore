@@ -5,8 +5,10 @@
 .dbg.*
 perf.*
 *.out
-/hello/
-/2021/*.c
 *.o
 *.bin
+/hello/
+/2021/*.c
+/2022/riscv/.cmd.sh
+/2022/riscv/main
 target/
