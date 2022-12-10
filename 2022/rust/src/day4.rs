@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 pub fn part1() {
     let inp = std::fs::read_to_string("../inputs/day4.txt").unwrap();
     let parse_assignment = |s: &str| {

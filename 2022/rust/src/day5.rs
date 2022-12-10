@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 pub fn part1() {
     let inp = std::fs::read_to_string("../inputs/day5.txt").unwrap();
     let (inp_stacks, inp) = inp.split_once(" 1   2").unwrap();
