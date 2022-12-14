@@ -12,3 +12,4 @@ perf.*
 /2022/riscv/.cmd.sh
 /2022/riscv/main
 target/
+inputs/
