@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::cmp::{max, min};
 use std::collections::HashSet;
 use std::ops::{Bound::*, RangeBounds, RangeInclusive};
