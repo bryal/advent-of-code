@@ -8,7 +8,8 @@ pub fn part1() {
     let valve0 = Valve::parse("AA");
     let remaining =
         rooms.iter().filter_map(|(v, r, _)| (*r > 0).then_some(*v)).collect::<Vec<Valve>>();
-    println!("Part 1: {}", solve(&[(valve0, 30)], &remaining, &rates, &jumps))
+    let depth0 = 0;
+    println!("Part 1: {}", solve(valve0, 30, &remaining, depth0, &rates, &jumps))
 }
 
 pub fn part2() {
@@ -18,38 +19,46 @@ pub fn part2() {
     let valve0 = Valve::parse("AA");
     let remaining =
         rooms.iter().filter_map(|(v, r, _)| (*r > 0).then_some(*v)).collect::<Vec<Valve>>();
-    println!("Part 2: {}", solve(&[(valve0, 26), (valve0, 26)], &remaining, &rates, &jumps))
+    let depth0 = 0;
+    let released = (0..(1 << remaining.len()))
+        .map(|bits| {
+            let (mut remaining1, mut remaining2) = (vec![], vec![]);
+            for (i, &x) in remaining.iter().enumerate() {
+                if ((bits >> i) & 1) == 1 {
+                    remaining1.push(x);
+                } else {
+                    remaining2.push(x);
+                }
+            }
+            solve(valve0, 26, &remaining1, depth0, &rates, &jumps)
+                + solve(valve0, 26, &remaining2, depth0, &rates, &jumps)
+        })
+        .max()
+        .unwrap();
+    println!("Part 2: {}", released)
 }
 
 fn solve(
-    actors: &[(Valve, Minutes)],
+    valve: Valve,
+    minutes: Minutes,
     remaining: &[Valve],
+    depth: u8,
     rates: &HashMap<Valve, Rate>,
     jumps: &HashMap<[Valve; 2], Minutes>,
 ) -> u16 {
     let go = |ri| {
         let next = remaining[ri];
-        let (mut minutes, ai) = actors
-            .iter()
-            .enumerate()
-            .map(|(ai, &(valve, minutes))| {
-                let dist = jumps[&[valve, next]];
-                (minutes.saturating_sub(dist), ai)
-            })
-            .max()
-            .unwrap();
-        if minutes == 0 {
+        let dist = jumps[&[valve, next]];
+        if minutes.saturating_sub(dist) == 0 {
             0
         } else {
-            minutes -= 1;
-            let mut actors = actors.to_vec();
-            actors[ai] = (next, minutes);
+            let minutes = minutes - dist - 1;
             let mut remaining = remaining.to_vec();
             remaining.remove(ri);
-            minutes * rates[&next] + solve(&actors, &remaining, rates, jumps)
+            minutes * rates[&next] + solve(next, minutes, &remaining, depth + 1, rates, jumps)
         }
     };
-    if remaining.len() > 13 {
+    if depth < 3 {
         (0..remaining.len()).into_par_iter().map(go).max().unwrap_or(0)
     } else {
         (0..remaining.len()).map(go).max().unwrap_or(0)
