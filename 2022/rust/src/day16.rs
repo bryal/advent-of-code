@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet, VecDeque};
 
