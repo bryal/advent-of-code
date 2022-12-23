@@ -10,6 +10,7 @@ mod day4;
 mod day5;
 mod day7;
 mod day8;
+mod linalg;
 
 fn main() {
     day22::day22();
