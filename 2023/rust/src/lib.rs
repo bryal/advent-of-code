@@ -1,7 +1,8 @@
 #![feature(pattern)]
 
-pub use std::collections::HashMap;
+pub use std::collections::{HashMap, HashSet, VecDeque};
 pub use std::iter::{once, repeat};
+pub use std::ops::Range;
 use std::str::pattern::Pattern;
 
 pub fn day_input(n: u8) -> String {
